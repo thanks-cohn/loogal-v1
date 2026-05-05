@@ -13,6 +13,7 @@
 #include "history.h"
 #include "similar.h"
 #include "window_api.h"
+#include "ingest.h"
 #include "loogal/watch_config.h"
 #include "loogal/watch_run.h"
 #include <stdio.h>
@@ -25,6 +26,7 @@ static void usage(void) {
     puts("");
     puts("Commands:");
     puts("  loogal index <directories...>");
+puts("  loogal ingest <path> [--all|--pdf|--comics|--images-only] --dry-run [--json]");
     puts("  loogal learn <directories...>");
     puts("  loogal search <image> [MIN_PERCENT]");
     puts("  loogal stats");
@@ -86,6 +88,12 @@ int main(int argc, char **argv) {
         rc = cmd_index(argc - 2, argv + 2);
         return finish_command(cmd, rc, start_ms);
     }
+
+if (strcmp(cmd, "ingest") == 0) {
+rc = cmd_ingest(argc - 2, argv + 2);
+return finish_command(cmd, rc, start_ms);
+}
+
 
 if (strcmp(cmd, "learn") == 0) {
 rc = cmd_learn(argc - 2, argv + 2);
