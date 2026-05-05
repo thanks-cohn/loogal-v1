@@ -51,7 +51,7 @@ Folders you forgot.
 Files you didn’t name.
 A PDF you didn’t even remember existed.
 
-And somehow—
+And somehow...
 
 it found all of them.
 
@@ -148,7 +148,7 @@ Because:
 
 --------------------------------------------------------------------------------
 
-WHAT COMES NEXT — PDF MAVERICK
+WHAT COMES NEXT ! PDF MAVERICK
 
 Right now, Loogal finds images.
 
@@ -173,13 +173,13 @@ Even if that PDF is:
 
 Search still resolves.
 
-Because Loogal tracks the document—not just the path.
+Because Loogal tracks the documen, not just the path.
 
 --------------------------------------------------------------------------------
 
 THE PROMISE
 
-If the image exists anywhere on your system—
+If the image exists anywhere on your system
 
 Loogal should lead you back to it.
 
