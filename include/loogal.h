@@ -11,6 +11,9 @@
 #define LOOGAL_DATA_DIR "data"
 #define LOOGAL_BIN_PATH "data/loogal.bin"
 #define LOOGAL_RECORDS_PATH "data/records.jsonl"
+#define LOOGAL_IDENTITIES_PATH "data/identities.jsonl"
+#define LOOGAL_LOCATIONS_PATH "data/locations.jsonl"
+#define LOOGAL_EVENTS_PATH "data/events.jsonl"
 #define LOOGAL_LOG_PATH "data/logs/loogal.jsonl"
 #define LOOGAL_MANIFEST_DIR "data/manifests"
 
@@ -39,6 +42,7 @@ typedef struct {
     int height;
     uint64_t file_size;
     uint64_t dhash;
+    char sha256[65];
     float aspect;
     char ext[16];
 } LoogalImageInfo;

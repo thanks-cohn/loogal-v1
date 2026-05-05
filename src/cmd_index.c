@@ -1,5 +1,6 @@
 #define _XOPEN_SOURCE 700
 #include "loogal.h"
+#include "memory.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,73 +8,187 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static LoogalRecord *g_records = NULL;
-static size_t g_count = 0, g_cap = 0;
-static FILE *g_jsonl = NULL;
+typedef struct {
+    LoogalMemory memory;
+    size_t scanned_files;
+    size_t skipped_files;
+    int fresh;
+    int dry_run;
+} LoogalIndexContext;
 
-static void add_record(const LoogalImageInfo *info) {
-    if (g_count == g_cap) {
-        g_cap = g_cap ? g_cap * 2 : 1024;
-        g_records = realloc(g_records, g_cap * sizeof(LoogalRecord));
-        if (!g_records) exit(2);
+static LoogalIndexContext *g_ctx = NULL;
+
+static void write_compat_records_jsonl(const LoogalRecord *records, size_t count) {
+    FILE *f = fopen(LOOGAL_RECORDS_PATH, "w");
+    if (!f) {
+        loogal_log("records.compat", "warn", "could not write records.jsonl compatibility projection");
+        return;
     }
-    LoogalRecord *r = &g_records[g_count];
-    memset(r, 0, sizeof(*r));
-    r->id = g_count + 1;
-    r->dhash = info->dhash;
-    r->aspect = info->aspect;
-    r->file_size = info->file_size;
-    r->width = info->width;
-    r->height = info->height;
-    snprintf(r->path, sizeof(r->path), "%s", info->path);
 
-    char *p = json_escape(info->path);
-    fprintf(g_jsonl, "{\"id\":%llu,\"tool\":\"loogal\",\"type\":\"image_record\",\"path\":\"%s\",\"extension\":\"%s\",\"width\":%d,\"height\":%d,\"file_size_bytes\":%llu,\"dhash\":\"%016llx\",\"signature_engine\":\"dhash:v1\"}\n",
-        (unsigned long long)r->id, p ? p : "", info->ext, info->width, info->height,
-        (unsigned long long)info->file_size, (unsigned long long)info->dhash);
-    free(p);
-    g_count++;
+    for (size_t i = 0; i < count; i++) {
+        const LoogalRecord *r = &records[i];
+        char *p = json_escape(r->path);
+        fprintf(f, "{\"id\":%llu,\"tool\":\"loogal\",\"type\":\"image_record\",\"path\":\"%s\",\"width\":%d,\"height\":%d,\"file_size_bytes\":%llu,\"dhash\":\"%016llx\",\"signature_engine\":\"dhash:v1\",\"projection\":\"active_memory:v1\"}\n",
+                (unsigned long long)r->id,
+                p ? p : "",
+                r->width,
+                r->height,
+                (unsigned long long)r->file_size,
+                (unsigned long long)r->dhash);
+        free(p);
+    }
+
+    fclose(f);
 }
 
-static int visitor(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
-    (void)sb; (void)ftwbuf;
-    if (typeflag != FTW_F) return 0;
-    if (!image_is_supported(fpath)) return 0;
-    LoogalImageInfo info;
-    if (image_probe(fpath, &info) == 0) {
-        add_record(&info);
-        if (g_count % 100 == 0) {
-            char msg[128]; snprintf(msg, sizeof(msg), "indexed %zu images so far", g_count);
-            loogal_log("index.progress", "ok", msg);
+static int parse_flags(int argc, char **argv, int *fresh, int *dry_run, int *first_path) {
+    *fresh = 0;
+    *dry_run = 0;
+    *first_path = 0;
+
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "--fresh") == 0) {
+            *fresh = 1;
+        } else if (strcmp(argv[i], "--dry-run") == 0) {
+            *dry_run = 1;
+        } else if (argv[i][0] == '-') {
+            char msg[256];
+            snprintf(msg, sizeof(msg), "unknown index flag: %s", argv[i]);
+            loogal_die("index.flags", msg);
+            return -1;
+        } else {
+            *first_path = i;
+            return 0;
         }
-    } else {
-        loogal_log("index.skip", "warn", fpath);
     }
     return 0;
 }
 
+static int visitor(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
+    (void)sb;
+    (void)ftwbuf;
+
+    if (typeflag != FTW_F) return 0;
+    if (!image_is_supported(fpath)) return 0;
+
+    g_ctx->scanned_files++;
+
+    LoogalImageInfo info;
+    if (image_probe(fpath, &info) == 0) {
+        if (!g_ctx->dry_run) {
+            loogal_memory_ingest_image(&g_ctx->memory, &info);
+        }
+        if (g_ctx->scanned_files % 100 == 0) {
+            char msg[160];
+            snprintf(msg, sizeof(msg), "scanned=%zu new_identities=%zu new_locations=%zu known=%zu",
+                     g_ctx->scanned_files,
+                     g_ctx->memory.seen_new_identities,
+                     g_ctx->memory.seen_new_locations,
+                     g_ctx->memory.seen_known_locations);
+            loogal_log("index.progress", "ok", msg);
+        }
+    } else {
+        g_ctx->skipped_files++;
+        loogal_log("index.skip", "warn", fpath);
+    }
+
+    return 0;
+}
+
 int cmd_index(int argc, char **argv) {
-    if (argc < 1) { loogal_die("index", "usage: loogal index <directories...>"); return 1; }
+    if (argc < 1) {
+        loogal_die("index", "usage: loogal index [--fresh] [--dry-run] <directories...>");
+        return 1;
+    }
+
     ensure_dirs();
-    g_jsonl = fopen(LOOGAL_RECORDS_PATH, "w");
-    if (!g_jsonl) { loogal_die("index", "could not open records.jsonl"); return 1; }
-    loogal_log("index.start", "ok", "starting directory index");
-    for (int i = 0; i < argc; i++) {
-        char msg[LOOGAL_PATH_MAX + 64]; snprintf(msg, sizeof(msg), "scanning %s", argv[i]);
+
+    static LoogalIndexContext ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    g_ctx = &ctx;
+
+    int first_path = 0;
+    if (parse_flags(argc, argv, &ctx.fresh, &ctx.dry_run, &first_path) != 0) return 1;
+    if (first_path >= argc) {
+        loogal_die("index", "usage: loogal index [--fresh] [--dry-run] <directories...>");
+        return 1;
+    }
+
+    if (ctx.fresh && !ctx.dry_run) {
+        loogal_memory_reset_files();
+        loogal_log("index.fresh", "ok", "fresh index requested; old memory files removed");
+    }
+
+    if (loogal_memory_load(&ctx.memory) != 0) {
+        loogal_die("index", "could not load memory files");
+        return 1;
+    }
+
+    loogal_log("index.start", "ok", ctx.dry_run ? "starting non-destructive dry-run" : "starting non-destructive memory index");
+
+    for (int i = first_path; i < argc; i++) {
+        char msg[LOOGAL_PATH_MAX + 96];
+        snprintf(msg, sizeof(msg), "scanning %s", argv[i]);
         loogal_log("index.scan_dir", "ok", msg);
-        nftw(argv[i], visitor, 32, FTW_PHYS);
+        if (nftw(argv[i], visitor, 32, FTW_PHYS) != 0) {
+            loogal_log("index.scan_dir", "warn", argv[i]);
+        }
     }
-    fclose(g_jsonl);
-    if (write_index_records(g_records, g_count) != 0) {
-        free(g_records); loogal_die("index", "failed writing binary index"); return 1;
+
+    LoogalRecord *records = NULL;
+    size_t record_count = 0;
+
+    if (loogal_memory_build_records(&ctx.memory, &records, &record_count) != 0) {
+        loogal_memory_free(&ctx.memory);
+        loogal_die("index", "failed building active memory projection");
+        return 1;
     }
+
+    if (!ctx.dry_run) {
+        if (loogal_memory_save(&ctx.memory) != 0) {
+            free(records);
+            loogal_memory_free(&ctx.memory);
+            loogal_die("index", "failed saving memory files");
+            return 1;
+        }
+        write_compat_records_jsonl(records, record_count);
+        if (write_index_records(records, record_count) != 0) {
+            free(records);
+            loogal_memory_free(&ctx.memory);
+            loogal_die("index", "failed writing binary index");
+            return 1;
+        }
+    }
+
     printf("LOOGAL INDEX COMPLETE\n");
-    printf("  Images indexed : %zu\n", g_count);
-    printf("  Binary index   : %s\n", LOOGAL_BIN_PATH);
-    printf("  Truth records  : %s\n", LOOGAL_RECORDS_PATH);
-    printf("  Logs           : %s\n", LOOGAL_LOG_PATH);
-    char msg[128]; snprintf(msg, sizeof(msg), "indexed %zu images", g_count);
+    printf("  Mode              : %s\n", ctx.dry_run ? "dry-run" : (ctx.fresh ? "fresh rebuild" : "merge / non-destructive"));
+    printf("  Files scanned     : %zu\n", ctx.scanned_files);
+    printf("  Files skipped     : %zu\n", ctx.skipped_files);
+    printf("  New identities    : %zu\n", ctx.memory.seen_new_identities);
+    printf("  New locations     : %zu\n", ctx.memory.seen_new_locations);
+    printf("  Known locations   : %zu\n", ctx.memory.seen_known_locations);
+    printf("  Duplicate refs    : %zu\n", ctx.memory.seen_duplicate_locations);
+    printf("  Modified paths    : %zu\n", ctx.memory.seen_modified_paths);
+    printf("  Active records    : %zu\n", record_count);
+    printf("  Binary index      : %s\n", LOOGAL_BIN_PATH);
+    printf("  Identities        : %s\n", LOOGAL_IDENTITIES_PATH);
+    printf("  Locations         : %s\n", LOOGAL_LOCATIONS_PATH);
+    printf("  Events            : %s\n", LOOGAL_EVENTS_PATH);
+    printf("  Logs              : %s\n", LOOGAL_LOG_PATH);
+
+    char msg[256];
+    snprintf(msg, sizeof(msg), "scanned=%zu active_records=%zu new_identities=%zu new_locations=%zu known=%zu duplicates=%zu modified=%zu",
+             ctx.scanned_files, record_count,
+             ctx.memory.seen_new_identities,
+             ctx.memory.seen_new_locations,
+             ctx.memory.seen_known_locations,
+             ctx.memory.seen_duplicate_locations,
+             ctx.memory.seen_modified_paths);
     loogal_log("index.complete", "ok", msg);
-    free(g_records);
+    loogal_memory_append_event("index.complete", "ok", "", 0, msg);
+
+    free(records);
+    loogal_memory_free(&ctx.memory);
+    g_ctx = NULL;
     return 0;
 }
