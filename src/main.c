@@ -168,30 +168,11 @@ return finish_command(cmd, rc, start_ms);
 }
 
     if (strcmp(cmd, "where") == 0) {
-        if (loogal_has_flag(argc, argv, "--json")) {
-            puts("{");
-            printf("  ");
-            loogal_json_kv_string(stdout, "binary_index", "data/loogal.bin", 1);
-            printf("  ");
-            loogal_json_kv_string(stdout, "records", "data/records.jsonl", 1);
-            printf("  ");
-            loogal_json_kv_string(stdout, "logs", "data/logs/loogal.jsonl", 1);
-            printf("  ");
-            loogal_json_kv_string(stdout, "manifests", "data/manifests/", 0);
-            puts("}");
-        } else {
-            puts("LOOGAL STORAGE");
-            puts("  binary index : data/loogal.bin");
-            puts("  records      : data/records.jsonl");
-            puts("  logs         : data/logs/loogal.jsonl");
-            puts("  manifests    : data/manifests/");
-        }
+rc = cmd_where(argc - 2, argv + 2);
+return finish_command(cmd, rc, start_ms);
+}
 
-        loogal_log("where", "ok", "printed storage locations");
-        return finish_command(cmd, 0, start_ms);
-    }
-
-    if (strcmp(cmd, "help") == 0 || strcmp(cmd, "--help") == 0) {
+if (strcmp(cmd, "help") == 0 || strcmp(cmd, "--help") == 0) {
         usage();
         return finish_command(cmd, 0, start_ms);
     }
