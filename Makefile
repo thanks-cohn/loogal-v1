@@ -90,3 +90,9 @@ test-native-similarity: $(BIN)
 	bash tests/test_native_similarity_backend.sh
 
 .PHONY: test-native-similarity
+
+
+test-shadow-core:
+	bash tests/test_shadow_core.sh
+
+.PHONY: test-shadow-core
