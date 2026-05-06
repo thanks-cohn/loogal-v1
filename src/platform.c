@@ -7,6 +7,29 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
+
+int loogal_platform_file_exists(const char *path) {
+    if (!path || !path[0]) return 0;
+
+    struct stat st;
+
+    if (stat(path, &st) != 0) {
+        return 0;
+    }
+
+    return S_ISREG(st.st_mode) ? 1 : 0;
+}
+
+int loogal_platform_file_readable(const char *path) {
+    if (!path || !path[0]) return 0;
+
+    if (!loogal_platform_file_exists(path)) {
+        return 0;
+    }
+
+    return access(path, R_OK) == 0 ? 1 : 0;
+}
 
 int loogal_platform_file_size(const char *path, uint64_t *out_size) {
     if (!path || !out_size) return -1;

@@ -30,6 +30,14 @@ int main(void) {
     fwrite("loogal", 1, 6, f);
     fclose(f);
 
+    if (!loogal_platform_file_exists(src)) {
+        return fail("file_exists failed");
+    }
+
+    if (!loogal_platform_file_readable(src)) {
+        return fail("file_readable failed");
+    }
+
     uint64_t size = 0;
     if (loogal_platform_file_size(src, &size) != 0) {
         return fail("file_size failed");

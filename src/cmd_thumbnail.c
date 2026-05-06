@@ -140,7 +140,7 @@ static int create_one(const char *path, int size, int force, int dry_run, int as
         loogal_log("thumbnail", "error", "unsupported image type");
         return 1;
     }
-    if (access(path, R_OK) != 0) {
+    if (!loogal_platform_file_readable(path)) {
         fprintf(stderr, "[loogal:thumbnail_error] cannot read image: %s\n", path);
         loogal_log("thumbnail", "error", "cannot read image");
         return 1;
@@ -159,7 +159,7 @@ static int create_one(const char *path, int size, int force, int dry_run, int as
     }
     if (thumb_out && thumb_out_sz) snprintf(thumb_out, thumb_out_sz, "%s", thumb);
 
-    int exists = access(thumb, R_OK) == 0;
+    int exists = loogal_platform_file_readable(thumb);
     int will_create = force || !exists;
 
     if (!dry_run && will_create) {
