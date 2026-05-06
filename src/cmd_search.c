@@ -2,6 +2,7 @@
 #include "loogal.h"
 #include "jsonout.h"
 #include "timer.h"
+#include "loogal/shadow.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,9 +17,18 @@
 
 typedef struct {
     int hash_distance;
+    int ahash_distance;
     double similarity;
+    double dhash_similarity;
+    double ahash_similarity;
+    double aspect_similarity;
     LoogalRecord rec;
 } Hit;
+
+typedef enum {
+    LOOGAL_SEARCH_ENGINE_DHASH = 1,
+    LOOGAL_SEARCH_ENGINE_SHADOW = 2
+} LoogalSearchEngine;
 
 typedef struct {
     unsigned long long identity_id;
@@ -241,6 +251,7 @@ static void print_json_results(
     const char *query_path,
     const char *place_filter,
     double min_percent,
+    LoogalSearchEngine engine,
     size_t candidates,
     size_t total_hits,
     Hit *hits,
@@ -262,7 +273,7 @@ static void print_json_results(
     puts("{");
     printf("  "); loogal_json_kv_string(stdout, "tool", "loogal", 1);
     printf("  "); loogal_json_kv_string(stdout, "type", "search.results", 1);
-    printf("  "); loogal_json_kv_string(stdout, "engine", "binary_index:dhash:v1", 1);
+    printf("  "); loogal_json_kv_string(stdout, "engine", engine == LOOGAL_SEARCH_ENGINE_SHADOW ? "binary_index:shadow:v1" : "binary_index:dhash:v1", 1);
     printf("  "); loogal_json_kv_string(stdout, "identity_expansion", "locations.jsonl:v1", 1);
     printf("  "); loogal_json_kv_string(stdout, "query", query_path, 1);
 
@@ -298,6 +309,10 @@ static void print_json_results(
         printf("      \"similarity\": %.6f,\n", h->similarity);
         printf("      \"similarity_percent\": %.3f,\n", pct);
         printf("      \"hash_distance\": %d,\n", h->hash_distance);
+        printf("      \"ahash_distance\": %d,\n", h->ahash_distance);
+        printf("      \"dhash_similarity\": %.6f,\n", h->dhash_similarity);
+        printf("      \"ahash_similarity\": %.6f,\n", h->ahash_similarity);
+        printf("      \"aspect_similarity\": %.6f,\n", h->aspect_similarity);
         printf("      \"width\": %d,\n", h->rec.width);
         printf("      \"height\": %d,\n", h->rec.height);
         printf("      \"file_size_bytes\": %llu,\n", (unsigned long long)h->rec.file_size);
@@ -339,6 +354,7 @@ static void print_human_results(
     const char *query_path,
     const char *place_filter,
     double min_percent,
+    LoogalSearchEngine engine,
     size_t candidates,
     size_t total_hits,
     Hit *hits,
@@ -360,7 +376,7 @@ static void print_human_results(
     puts("Loogal search results:");
     printf("target:     %s\n", query_path);
     printf("scope:      %s\n", (place_filter && *place_filter) ? place_filter : "memory/binary-index");
-    printf("engine:     binary_index:dhash:v1\n");
+    printf("engine:     %s\n", engine == LOOGAL_SEARCH_ENGINE_SHADOW ? "binary_index:shadow:v1" : "binary_index:dhash:v1");
     printf("identity:   locations.jsonl:v1\n");
     printf("min:        %.2f%%\n", min_percent);
     printf("candidates: %zu\n", candidates);
@@ -377,12 +393,25 @@ static void print_human_results(
         SearchIdentityInfo identity = load_identity_info_for_path(h->rec.path);
 
         printf("%zu.%s %s\n", i + 1, label, h->rec.path);
-        printf(
-            "   match: %.3f%%  similarity: %.6f  hash: %d/64\n",
-            h->similarity * 100.0,
-            h->similarity,
-            h->hash_distance
-        );
+        if (engine == LOOGAL_SEARCH_ENGINE_SHADOW) {
+            printf(
+                "   match: %.3f%%  shadow: %.6f  dhash: %.3f%% (%d/64)  ahash: %.3f%% (%d/64)  aspect: %.3f%%\n",
+                h->similarity * 100.0,
+                h->similarity,
+                h->dhash_similarity * 100.0,
+                h->hash_distance,
+                h->ahash_similarity * 100.0,
+                h->ahash_distance,
+                h->aspect_similarity * 100.0
+            );
+        } else {
+            printf(
+                "   match: %.3f%%  similarity: %.6f  hash: %d/64\n",
+                h->similarity * 100.0,
+                h->similarity,
+                h->hash_distance
+            );
+        }
 
         if (identity.identity_id) {
             printf("   identity_id: %llu  known_locations: %ld\n", identity.identity_id, identity.location_count);
@@ -409,6 +438,7 @@ int cmd_search(int argc, char **argv) {
 
     char place_filter[LOOGAL_PATH_MAX] = "";
     double min_percent = 60.0;
+    LoogalSearchEngine engine = LOOGAL_SEARCH_ENGINE_DHASH;
     size_t limit = 10;
     size_t offset = 0;
     int as_json = 0;
@@ -423,6 +453,26 @@ int cmd_search(int argc, char **argv) {
 
         if (strcmp(a, "--memory") == 0) {
             place_filter[0] = '\0';
+            continue;
+        }
+
+        if (strcmp(a, "--engine") == 0 && i + 1 < argc) {
+            const char *engine_name = argv[++i];
+
+            if (strcmp(engine_name, "shadow") == 0 || strcmp(engine_name, "fused") == 0) {
+                engine = LOOGAL_SEARCH_ENGINE_SHADOW;
+            } else if (strcmp(engine_name, "dhash") == 0) {
+                engine = LOOGAL_SEARCH_ENGINE_DHASH;
+            } else {
+                loogal_die("search", "unknown engine; use dhash or shadow");
+                return 1;
+            }
+
+            continue;
+        }
+
+        if (strcmp(a, "--shadow") == 0) {
+            engine = LOOGAL_SEARCH_ENGINE_SHADOW;
             continue;
         }
 
@@ -500,12 +550,59 @@ int cmd_search(int argc, char **argv) {
         candidate_count++;
 
         int dist = hamming64(query.dhash, records[i].dhash);
-        double sim = 1.0 - ((double)dist / 64.0);
+        int adist = hamming64(query.ahash, records[i].ahash);
+
+        double dsim = 1.0 - ((double)dist / 64.0);
+        double asim = 1.0 - ((double)adist / 64.0);
+        double aspect_sim = 0.0;
+        double sim = dsim;
+
+        if (query.aspect > 0.0f && records[i].aspect > 0.0f) {
+            float qa = query.aspect;
+            float ra = records[i].aspect;
+            float small = qa < ra ? qa : ra;
+            float large = qa > ra ? qa : ra;
+
+            if (large > 0.0f) {
+                aspect_sim = (double)(small / large);
+            }
+        }
+
+        if (engine == LOOGAL_SEARCH_ENGINE_SHADOW) {
+            LoogalShadow qs;
+            LoogalShadow rs;
+
+            memset(&qs, 0, sizeof(qs));
+            memset(&rs, 0, sizeof(rs));
+
+            qs.dhash64 = query.dhash;
+            qs.ahash64 = query.ahash;
+            qs.width = query.width;
+            qs.height = query.height;
+            qs.aspect = query.aspect;
+            qs.has_dhash64 = 1;
+            qs.has_ahash64 = 1;
+
+            rs.dhash64 = records[i].dhash;
+            rs.ahash64 = records[i].ahash;
+            rs.width = records[i].width;
+            rs.height = records[i].height;
+            rs.aspect = records[i].aspect;
+            rs.has_dhash64 = 1;
+            rs.has_ahash64 = 1;
+
+            sim = loogal_shadow_fused_score(&qs, &rs);
+        }
+
         double pct = sim * 100.0;
 
         if (pct + 0.000001 >= min_percent) {
             hits[hcount].hash_distance = dist;
+            hits[hcount].ahash_distance = adist;
             hits[hcount].similarity = sim;
+            hits[hcount].dhash_similarity = dsim;
+            hits[hcount].ahash_similarity = asim;
+            hits[hcount].aspect_similarity = aspect_sim;
             hits[hcount].rec = records[i];
             hcount++;
         }
@@ -516,16 +613,16 @@ int cmd_search(int argc, char **argv) {
     double elapsed_ms = loogal_now_ms() - start_ms;
 
     if (as_json) {
-        print_json_results(query_path, place_filter, min_percent, candidate_count, hcount, hits, offset, limit, elapsed_ms);
+        print_json_results(query_path, place_filter, min_percent, engine, candidate_count, hcount, hits, offset, limit, elapsed_ms);
     } else {
-        print_human_results(query_path, place_filter, min_percent, candidate_count, hcount, hits, offset, limit, elapsed_ms);
+        print_human_results(query_path, place_filter, min_percent, engine, candidate_count, hcount, hits, offset, limit, elapsed_ms);
     }
 
     const char *place_label = place_filter[0] ? place_filter : "memory";
     int msg_len = snprintf(
         NULL,
         0,
-        "query=%.180s place=%.180s min=%.3f candidates=%zu hits=%zu limit=%zu offset=%zu json=%d duration_ms=%.3f engine=binary_index:dhash:v1 identity_expansion=locations.jsonl:v1",
+        "query=%.180s place=%.180s min=%.3f candidates=%zu hits=%zu limit=%zu offset=%zu json=%d duration_ms=%.3f engine=%s identity_expansion=locations.jsonl:v1",
         query_path,
         place_label,
         min_percent,
@@ -534,7 +631,8 @@ int cmd_search(int argc, char **argv) {
         limit,
         offset,
         as_json,
-        elapsed_ms
+        elapsed_ms,
+        engine == LOOGAL_SEARCH_ENGINE_SHADOW ? "binary_index:shadow:v1" : "binary_index:dhash:v1"
     );
 
     if (msg_len > 0) {
@@ -543,7 +641,7 @@ int cmd_search(int argc, char **argv) {
             snprintf(
                 msg,
                 (size_t)msg_len + 1,
-                "query=%.180s place=%.180s min=%.3f candidates=%zu hits=%zu limit=%zu offset=%zu json=%d duration_ms=%.3f engine=binary_index:dhash:v1 identity_expansion=locations.jsonl:v1",
+                "query=%.180s place=%.180s min=%.3f candidates=%zu hits=%zu limit=%zu offset=%zu json=%d duration_ms=%.3f engine=%s identity_expansion=locations.jsonl:v1",
                 query_path,
                 place_label,
                 min_percent,
@@ -552,7 +650,8 @@ int cmd_search(int argc, char **argv) {
                 limit,
                 offset,
                 as_json,
-                elapsed_ms
+                elapsed_ms,
+                engine == LOOGAL_SEARCH_ENGINE_SHADOW ? "binary_index:shadow:v1" : "binary_index:dhash:v1"
             );
             loogal_log("search.complete", "ok", msg);
             free(msg);
