@@ -29,3 +29,5 @@ Next steps:
     5. Native phash64
     6. Variants and deltas
     7. Observations for PDFs, comics, long screenshots, and embedded regions
+
+The fastest thing around! We're electricity with nothing but bare metal in our way!
