@@ -2,6 +2,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "loogal/watch_run.h"
+#include "loogal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -120,51 +121,23 @@ static int due_now(const WatchEntry *e, const struct tm *tmv) {
     return 0;
 }
 
-static int shell_quote(const char *in, char *out, size_t out_sz) {
-    size_t j = 0;
-    if (!in || !out || out_sz < 3) return 0;
-
-    out[j++] = '\'';
-
-    for (size_t i = 0; in[i]; i++) {
-        if (in[i] == '\'') {
-            if (j + 4 >= out_sz) return 0;
-            out[j++] = '\'';
-            out[j++] = '\\';
-            out[j++] = '\'';
-            out[j++] = '\'';
-        } else {
-            if (j + 1 >= out_sz) return 0;
-            out[j++] = in[i];
-        }
-    }
-
-    if (j + 2 >= out_sz) return 0;
-    out[j++] = '\'';
-    out[j] = 0;
-    return 1;
-}
-
 static int run_index_for_path(const char *path, int dry_run) {
-    char quoted[8192];
-    char cmd[10000];
-
-    if (!shell_quote(path, quoted, sizeof(quoted))) {
-        fprintf(stderr, "[loogal-watch-run:error] path too long: %s\n", path);
+    if (!path || !path[0]) {
+        fprintf(stderr, "[loogal-watch-run:error] empty path\n");
         return 1;
     }
 
-    snprintf(cmd, sizeof(cmd), "./loogal index %s", quoted);
-
     if (dry_run) {
-        printf("[loogal-watch-run:dry] %s\n", cmd);
+        printf("[loogal-watch-run:dry] loogal index %s\n", path);
         return 0;
     }
 
     printf("[loogal-watch-run] indexing: %s\n", path);
     fflush(stdout);
 
-    int rc = system(cmd);
+    char *argv[] = { "index", (char *)path };
+    int rc = cmd_index(2, argv);
+
     if (rc == 0) {
         printf("[loogal-watch-run] OK: %s\n", path);
         return 0;
