@@ -253,7 +253,11 @@ static void print_json_results(
     if (end > total_hits) end = total_hits;
 
     size_t returned = offset < total_hits ? end - offset : 0;
-    double ips = elapsed_ms > 0.0 ? ((double)candidates / (elapsed_ms / 1000.0)) : 0.0;
+    double elapsed_s = elapsed_ms / 1000.0;
+    double elapsed_ns = elapsed_s * 1000000000.0;
+    double images_per_second = elapsed_s > 0.0 ? ((double)candidates / elapsed_s) : 0.0;
+    double images_per_ns = elapsed_ns > 0.0 ? ((double)candidates / elapsed_ns) : 0.0;
+    double ns_per_image = candidates > 0 ? (elapsed_ns / (double)candidates) : 0.0;
 
     puts("{");
     printf("  "); loogal_json_kv_string(stdout, "tool", "loogal", 1);
@@ -274,8 +278,11 @@ static void print_json_results(
     printf("  "); loogal_json_kv_int(stdout, "offset", (long long)offset, 1);
     printf("  "); loogal_json_kv_int(stdout, "limit", (long long)limit, 1);
     printf("  "); loogal_json_kv_int(stdout, "returned", (long long)returned, 1);
-    printf("  \"duration_ms\": %.3f,\n", elapsed_ms);
-    printf("  \"images_per_second\": %.3f,\n", ips);
+    printf("  \"duration_seconds\": %.9f,\n", elapsed_s);
+    printf("  \"duration_nanoseconds\": %.0f,\n", elapsed_ns);
+    printf("  \"images_per_second\": %.3f,\n", images_per_second);
+    printf("  \"images_per_nanosecond\": %.12f,\n", images_per_ns);
+    printf("  \"nanoseconds_per_image\": %.3f,\n", ns_per_image);
     puts("  \"results\": [");
 
     for (size_t i = offset; i < end; i++) {
@@ -344,7 +351,11 @@ static void print_human_results(
     if (end > total_hits) end = total_hits;
 
     size_t returned = offset < total_hits ? end - offset : 0;
-    double ips = elapsed_ms > 0.0 ? ((double)candidates / (elapsed_ms / 1000.0)) : 0.0;
+    double elapsed_s = elapsed_ms / 1000.0;
+    double elapsed_ns = elapsed_s * 1000000000.0;
+    double images_per_second = elapsed_s > 0.0 ? ((double)candidates / elapsed_s) : 0.0;
+    double images_per_ns = elapsed_ns > 0.0 ? ((double)candidates / elapsed_ns) : 0.0;
+    double ns_per_image = candidates > 0 ? (elapsed_ns / (double)candidates) : 0.0;
 
     puts("Loogal search results:");
     printf("target:     %s\n", query_path);
@@ -355,8 +366,10 @@ static void print_human_results(
     printf("candidates: %zu\n", candidates);
     printf("total hits: %zu\n", total_hits);
     printf("returned:   %zu\n", returned);
-    printf("time:       %.3fs\n", elapsed_ms / 1000.0);
-    printf("speed:      %.0f images/sec\n\n", ips);
+    printf("time:       %.6f sec / %.0f ns\n", elapsed_s, elapsed_ns);
+    printf("speed:      %'.0f images/sec\n", images_per_second);
+    printf("nano:       %.12f images/ns\n", images_per_ns);
+    printf("cost:       %.0f ns/image\n\n", ns_per_image);
 
     for (size_t i = offset; i < end; i++) {
         Hit *h = &hits[i];
