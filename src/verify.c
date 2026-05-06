@@ -1,11 +1,12 @@
 #include "verify.h"
 #include "jsonout.h"
 #include "loogal.h"
+#include "loogal/platform.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 
 static long count_lines(const char *path) {
     FILE *f = fopen(path, "r");
@@ -27,9 +28,17 @@ static long count_lines(const char *path) {
 }
 
 static long verify_file_size_bytes_local(const char *path) {
-    struct stat st;
-    if (stat(path, &st) != 0) return -1;
-    return (long)st.st_size;
+uint64_t size = 0;
+
+if (loogal_platform_file_size(path, &size) != 0) {
+return -1;
+}
+
+if (size > (uint64_t)LONG_MAX) {
+return -1;
+}
+
+return (long)size;
 }
 
 static int extract_ull_field(const char *line, const char *key, unsigned long long *out) {
