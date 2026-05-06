@@ -4,6 +4,8 @@
 #include "loogal/watch_config.h"
 
 #include <stdio.h>
+#include <sys/stat.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
@@ -20,16 +22,23 @@ typedef struct {
     char enabled[16];
 } WatchEntry;
 
-static void ensure_watch_file(void) {
-    system("mkdir -p data/watch");
+static int ensure_watch_file(void) {
+    if (mkdir("data", 0755) != 0 && errno != EEXIST) {
+        fprintf(stderr, "[loogal:watch_config_error] could not create data directory\n");
+        return 1;
+    }
+    if (mkdir("data/watch", 0755) != 0 && errno != EEXIST) {
+        fprintf(stderr, "[loogal:watch_config_error] could not create data/watch directory\n");
+        return 1;
+    }
     FILE *f = fopen(WATCH_FILE, "r");
     if (f) {
         fclose(f);
-        return;
+        return 0;
     }
 
     f = fopen(WATCH_FILE, "w");
-    if (!f) return;
+    if (!f) return -1;
 
     const char *home = getenv("HOME");
     if (!home) home = "";
@@ -37,6 +46,7 @@ static void ensure_watch_file(void) {
     fprintf(f, "path\tschedule\ttime\tdate\tday\tenabled\n");
     fprintf(f, "%s/Pictures\tdaily\t00:00\t\t\tenabled\n", home);
     fclose(f);
+return 0;
 }
 
 static int normalize_path(const char *in, char *out, size_t out_sz) {
@@ -111,7 +121,9 @@ int loogal_cmd_watch_list(int argc, char **argv) {
     (void)argc;
     (void)argv;
 
-    ensure_watch_file();
+    if (ensure_watch_file() != 0) {
+return 1;
+}
 
     FILE *f = fopen(WATCH_FILE, "r");
     if (!f) {
@@ -156,7 +168,9 @@ int loogal_cmd_watch_list(int argc, char **argv) {
 }
 
 int loogal_cmd_watch_add(int argc, char **argv) {
-    ensure_watch_file();
+    if (ensure_watch_file() != 0) {
+return 1;
+}
 
     if (argc < 3) {
         fprintf(stderr, "Usage:\n");
@@ -232,7 +246,9 @@ int loogal_cmd_watch_add(int argc, char **argv) {
 }
 
 static int rewrite_status(const char *target, const char *new_status, int remove_it) {
-    ensure_watch_file();
+    if (ensure_watch_file() != 0) {
+return 1;
+}
 
     char norm[PATH_MAX];
     if (!normalize_path(target, norm, sizeof(norm))) return 1;
