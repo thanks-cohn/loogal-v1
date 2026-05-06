@@ -2,6 +2,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "loogal/watch_config.h"
+#include "loogal/platform.h"
 
 #include <stdio.h>
 #include <sys/stat.h>
@@ -23,14 +24,14 @@ typedef struct {
 } WatchEntry;
 
 static int ensure_watch_file(void) {
-    if (mkdir("data", 0755) != 0 && errno != EEXIST) {
-        fprintf(stderr, "[loogal:watch_config_error] could not create data directory\n");
-        return 1;
-    }
-    if (mkdir("data/watch", 0755) != 0 && errno != EEXIST) {
-        fprintf(stderr, "[loogal:watch_config_error] could not create data/watch directory\n");
-        return 1;
-    }
+if (loogal_platform_mkdir("data") != 0) {
+fprintf(stderr, "[loogal:watch_config_error] could not create data directory\n");
+return 1;
+}
+if (loogal_platform_mkdir("data/watch") != 0) {
+fprintf(stderr, "[loogal:watch_config_error] could not create data/watch directory\n");
+return 1;
+}
     FILE *f = fopen(WATCH_FILE, "r");
     if (f) {
         fclose(f);
