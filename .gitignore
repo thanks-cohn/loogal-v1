@@ -49,3 +49,7 @@ data/logs/
 # Python cache files from test helpers
 __pycache__/
 *.pyc
+
+# Python cache files from test helpers
+__pycache__/
+*.pyc
