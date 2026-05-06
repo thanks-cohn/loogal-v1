@@ -1,7 +1,7 @@
 CC ?= gcc
 CFLAGS ?= -O3 -Wall -Wextra -std=c11 -Iinclude
 LDFLAGS ?=
-SRC := $(wildcard src/*.c)
+SRC := $(wildcard src/*.c) $(wildcard src/core/*.c)
 OBJ := $(SRC:.c=.o)
 BIN := loogal
 
@@ -71,3 +71,9 @@ loogal-gallery-window: src/gui/loogal_gallery_window.c
 
 test-gallery-window:
 	bash tests/test_gallery_window_build.sh
+
+
+test-delta:
+	bash tests/test_delta_module.sh
+
+.PHONY: test-delta
