@@ -42,3 +42,6 @@ data/logs/
 *.jpg
 *.jpeg
 *.webp
+
+# Build artifacts
+*.o
