@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700
 
 #include "loogal.h"
+#include "loogal/platform.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -9,7 +10,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <time.h>
 
 typedef struct {
     uint64_t directories_seen;
@@ -45,14 +45,9 @@ typedef struct {
 } BenchScanStats;
 
 static uint64_t bench_now_ns(void) {
-    struct timespec ts;
-
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
-        return 0;
-    }
-
-    return ((uint64_t)ts.tv_sec * 1000000000ULL) + (uint64_t)ts.tv_nsec;
+return loogal_platform_now_ns();
 }
+
 
 static const char *bench_ext(const char *path) {
     const char *slash = strrchr(path, '/');
