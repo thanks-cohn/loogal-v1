@@ -1,18 +1,16 @@
 #define _XOPEN_SOURCE 700
 #include "loogal.h"
+#include "loogal/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <time.h>
-#include <errno.h>
-#include <unistd.h>
 #include <ctype.h>
 
 static void mkdir_if_missing(const char *p) {
-    if (mkdir(p, 0755) != 0 && errno != EEXIST) {
-        fprintf(stderr, "LOOGAL ERROR: failed to create %s: %s\n", p, strerror(errno));
-    }
+if (loogal_platform_mkdir(p) != 0) {
+fprintf(stderr, "LOOGAL ERROR: failed to create %s\n", p);
+}
 }
 
 int ensure_dirs(void) {
@@ -57,9 +55,13 @@ void loogal_die(const char *event, const char *message) {
 }
 
 uint64_t file_size_bytes(const char *path) {
-    struct stat st;
-    if (stat(path, &st) != 0) return 0;
-    return (uint64_t)st.st_size;
+uint64_t size = 0;
+
+if (loogal_platform_file_size(path, &size) != 0) {
+return 0;
+}
+
+return size;
 }
 
 const char *file_extension(const char *path) {
