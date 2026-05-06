@@ -276,6 +276,17 @@ int cmd_bench_scan(int argc, char **argv) {
     puts("privacy:       no paths, no hashes, no records written");
     puts("");
 
+    puts("summary:");
+    printf("  speed:                   %.6f files/sec\n", files_per_sec);
+    printf("  cost:                    %.6f ns/file\n", ns_per_file);
+    printf("  scanned:                 %llu files / %llu images\n",
+        (unsigned long long)st.files_seen,
+        (unsigned long long)st.supported_images);
+    printf("  total:                   %.6f sec / %llu ns\n",
+        total_s,
+        (unsigned long long)total_ns);
+    puts("");
+
     puts("totals:");
     bench_print_u64("directories_seen:", st.directories_seen);
     bench_print_u64("files_seen:", st.files_seen);

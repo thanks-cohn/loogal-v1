@@ -7,8 +7,8 @@ rm -rf /tmp/loogal-immortal-a /tmp/loogal-immortal-b \
        data/loogal.bin data/records.jsonl data/identities.jsonl data/locations.jsonl data/events.jsonl data/logs/loogal.jsonl
 mkdir -p /tmp/loogal-immortal-a /tmp/loogal-immortal-b data/logs
 
-magick -size 64x64 xc:white -fill black -draw 'rectangle 10,10 40,40' /tmp/loogal-immortal-a/box.png
-magick -size 64x64 xc:white -fill black -draw 'circle 32,32 32,10' /tmp/loogal-immortal-b/circle.png
+python tests/lib/make_png.py box /tmp/loogal-immortal-a/box.png
+python tests/lib/make_png.py circle /tmp/loogal-immortal-b/circle.png
 cp /tmp/loogal-immortal-a/box.png /tmp/loogal-immortal-b/box-copy.png
 
 ./loogal index --fresh /tmp/loogal-immortal-a > /tmp/loogal-immortal-step1.txt

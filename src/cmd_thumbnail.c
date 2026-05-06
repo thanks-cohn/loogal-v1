@@ -46,6 +46,46 @@ static int mkdir_if_needed(const char *p) {
     return 0;
 }
 
+
+static int loogal_copy_file_bytes(const char *src, const char *dst) {
+    FILE *in = fopen(src, "rb");
+    if (!in) return -1;
+
+    FILE *out = fopen(dst, "wb");
+    if (!out) {
+        fclose(in);
+        return -1;
+    }
+
+    unsigned char buf[65536];
+
+    for (;;) {
+        size_t n = fread(buf, 1, sizeof(buf), in);
+
+        if (n > 0) {
+            if (fwrite(buf, 1, n, out) != n) {
+                fclose(in);
+                fclose(out);
+                return -1;
+            }
+        }
+
+        if (n < sizeof(buf)) {
+            if (ferror(in)) {
+                fclose(in);
+                fclose(out);
+                return -1;
+            }
+
+            break;
+        }
+    }
+
+    fclose(in);
+    fclose(out);
+    return 0;
+}
+
 static uint64_t fnv1a64_bytes(const unsigned char *s, size_t n, uint64_t h) {
     for (size_t i = 0; i < n; i++) {
         h ^= (uint64_t)s[i];
@@ -117,22 +157,21 @@ static int create_one(const char *path, int size, int force, int dry_run, int as
     int will_create = force || !exists;
 
     if (!dry_run && will_create) {
-        char cmd[LOOGAL_PATH_MAX * 4];
-        int n = snprintf(cmd, sizeof(cmd),
-            "magick '%s' -auto-orient -thumbnail %dx%d -strip -quality 82 '%s'",
-            path, size, size, thumb);
-        if (n < 0 || n >= (int)sizeof(cmd)) {
-            fprintf(stderr, "[loogal:thumbnail_error] magick command too long\n");
-            loogal_log("thumbnail", "error", "magick command too long");
-            return 1;
-        }
-        int rc = system(cmd);
-        if (rc != 0) {
-            fprintf(stderr, "[loogal:thumbnail_error] magick failed while creating thumbnail\n");
-            loogal_log("thumbnail", "error", "magick thumbnail command failed");
-            return 1;
-        }
+    /*
+        Zero-dependency fallback:
+        We no longer shell out to ImageMagick here.
+
+        For now, thumbnail cache creation copies the source image bytes into
+        the thumbnail cache path. This preserves GUI/cache plumbing without
+        adding runtime dependencies. A future pure-C thumbnail resizer can
+        replace this helper without changing the command contract.
+    */
+    if (loogal_copy_file_bytes(path, thumb) != 0) {
+        fprintf(stderr, "[loogal:thumbnail_error] native thumbnail fallback failed\n");
+        loogal_log("thumbnail", "error", "native thumbnail fallback failed");
+        return 1;
     }
+}
 
     if (as_json) {
         puts("{");

@@ -6,8 +6,8 @@ cd "$(dirname "$0")/.."
 rm -rf /tmp/loogal-where-a /tmp/loogal-where-b
 mkdir -p /tmp/loogal-where-a /tmp/loogal-where-b
 
-magick -size 64x64 xc:red /tmp/loogal-where-a/red.png
-magick -size 64x64 xc:blue /tmp/loogal-where-b/blue.png
+python tests/lib/make_png.py red /tmp/loogal-where-a/red.png
+python tests/lib/make_png.py blue /tmp/loogal-where-b/blue.png
 cp /tmp/loogal-where-a/red.png /tmp/loogal-where-b/red-copy.png
 
 rm -f data/loogal.bin data/records.jsonl data/identities.jsonl data/locations.jsonl data/events.jsonl data/logs/loogal.jsonl

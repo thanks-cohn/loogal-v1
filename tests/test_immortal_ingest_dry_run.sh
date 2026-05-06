@@ -8,10 +8,10 @@ mkdir -p /tmp/loogal-ingest-root/images
 mkdir -p /tmp/loogal-ingest-root/docs
 mkdir -p /tmp/loogal-ingest-root/comic_pages
 
-magick -size 64x64 xc:red /tmp/loogal-ingest-root/images/red.png
-magick -size 64x64 xc:blue /tmp/loogal-ingest-root/images/blue.jpg
-magick -size 64x64 xc:white /tmp/loogal-ingest-root/comic_pages/page_001.png
-magick -size 64x64 xc:black /tmp/loogal-ingest-root/comic_pages/page_002.png
+python tests/lib/make_png.py red /tmp/loogal-ingest-root/images/red.png
+python tests/lib/make_png.py blue /tmp/loogal-ingest-root/images/blue.jpg
+python tests/lib/make_png.py white /tmp/loogal-ingest-root/comic_pages/page_001.png
+python tests/lib/make_png.py black /tmp/loogal-ingest-root/comic_pages/page_002.png
 
 printf "fake pdf placeholder\n" > /tmp/loogal-ingest-root/docs/paper.pdf
 printf "notes\n" > /tmp/loogal-ingest-root/notes.txt

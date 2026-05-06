@@ -8,9 +8,9 @@ mkdir -p /tmp/loogal-route-root/images
 mkdir -p /tmp/loogal-route-root/docs
 mkdir -p /tmp/loogal-route-root/comic_pages
 
-magick -size 64x64 xc:red /tmp/loogal-route-root/images/red.png
-magick -size 64x64 xc:blue /tmp/loogal-route-root/images/blue.jpg
-magick -size 64x64 xc:white /tmp/loogal-route-root/comic_pages/page_001.png
+python tests/lib/make_png.py red /tmp/loogal-route-root/images/red.png
+python tests/lib/make_png.py blue /tmp/loogal-route-root/images/blue.jpg
+python tests/lib/make_png.py white /tmp/loogal-route-root/comic_pages/page_001.png
 
 printf "fake pdf placeholder\n" > /tmp/loogal-route-root/docs/paper.pdf
 printf "notes\n" > /tmp/loogal-route-root/notes.txt
