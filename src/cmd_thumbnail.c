@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <dirent.h>
 #include <unistd.h>
 
 #define THUMB_DIR "data/thumbnails"
@@ -92,6 +93,55 @@ static uint64_t fnv1a64_bytes(const unsigned char *s, size_t n, uint64_t h) {
         h *= 1099511628211ULL;
     }
     return h;
+}
+
+
+static int loogal_count_thumbnail_cache(const char *dir_path, int *out_count, uint64_t *out_bytes) {
+    if (!dir_path || !out_count || !out_bytes) return -1;
+
+    *out_count = 0;
+    *out_bytes = 0;
+
+    DIR *dir = opendir(dir_path);
+    if (!dir) {
+        return 0;
+    }
+
+    for (;;) {
+        errno = 0;
+        struct dirent *ent = readdir(dir);
+
+        if (!ent) {
+            if (errno != 0) {
+                closedir(dir);
+                return -1;
+            }
+            break;
+        }
+
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) {
+            continue;
+        }
+
+        char path[LOOGAL_PATH_MAX * 2];
+        int n = snprintf(path, sizeof(path), "%s/%s", dir_path, ent->d_name);
+
+        if (n < 0 || n >= (int)sizeof(path)) {
+            continue;
+        }
+
+        struct stat st;
+
+        if (stat(path, &st) == 0 && S_ISREG(st.st_mode)) {
+            (*out_count)++;
+            if (st.st_size > 0) {
+                *out_bytes += (uint64_t)st.st_size;
+            }
+        }
+    }
+
+    closedir(dir);
+    return 0;
 }
 
 static uint64_t loogal_thumb_key(const char *path, int size) {
@@ -305,23 +355,27 @@ static int cmd_thumb_session(int argc, char **argv) {
 
 static int cmd_thumb_status(int argc, char **argv) {
     int as_json = has_flag(argc, argv, "--json");
+
     int count = 0;
     uint64_t bytes = 0;
-    FILE *p = popen("find data/thumbnails -type f 2>/dev/null", "r");
-    if (p) {
-        char path[4096];
-        while (fgets(path, sizeof(path), p)) {
-            path[strcspn(path, "\n")] = 0;
-            count++;
-            bytes += file_size_bytes(path);
-        }
-        pclose(p);
+
+    if (loogal_count_thumbnail_cache(THUMB_DIR, &count, &bytes) != 0) {
+        count = 0;
+        bytes = 0;
     }
+
     if (as_json) {
-        printf("{\n\"tool\": \"loogal\",\n\"type\": \"thumbnail.status\",\n\"directory\": \"%s\",\n\"count\": %d,\n\"bytes\": %llu\n}\n", THUMB_DIR, count, (unsigned long long)bytes);
+        printf("{\n\"tool\": \"loogal\",\n\"type\": \"thumbnail.status\",\n\"directory\": \"%s\",\n\"count\": %d,\n\"bytes\": %llu\n}\n",
+            THUMB_DIR,
+            count,
+            (unsigned long long)bytes);
     } else {
-        printf("LOOGAL THUMBNAILS\n  directory: %s\n  count:     %d\n  bytes:     %llu\n", THUMB_DIR, count, (unsigned long long)bytes);
+        printf("LOOGAL THUMBNAILS\n  directory: %s\n  count:     %d\n  bytes:     %llu\n",
+            THUMB_DIR,
+            count,
+            (unsigned long long)bytes);
     }
+
     return 0;
 }
 
