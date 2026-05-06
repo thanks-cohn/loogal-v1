@@ -18,10 +18,26 @@ typedef struct {
 
 static LoogalIndexContext *g_ctx = NULL;
 
+/*
+ * records.jsonl is an active compatibility projection.
+ *
+ * It is intentionally rebuilt from durable memory on each successful index run.
+ * It is not the sacred append-only truth layer.
+ *
+ * Durable memory lives in:
+ *   - identities.jsonl
+ *   - locations.jsonl
+ *   - events.jsonl
+ *
+ * This keeps indexing boring and dependable:
+ * observations/events are additive,
+ * identities and locations are compacted durable state,
+ * records.jsonl and loogal.bin are rebuildable speed/compatibility outputs.
+ */
 static void write_compat_records_jsonl(const LoogalRecord *records, size_t count) {
     FILE *f = fopen(LOOGAL_RECORDS_PATH, "w");
     if (!f) {
-        loogal_log("records.compat", "warn", "could not write records.jsonl compatibility projection");
+        loogal_log("records.compat", "warn", "could not write records.jsonl active compatibility projection");
         return;
     }
 
@@ -124,7 +140,7 @@ int cmd_index(int argc, char **argv) {
         return 1;
     }
 
-    loogal_log("index.start", "ok", ctx.dry_run ? "starting non-destructive dry-run" : "starting non-destructive memory index");
+    loogal_log("index.start", "ok", ctx.dry_run ? "starting non-destructive dry-run" : "starting bedrock memory index: durable memory merge plus rebuildable projections");
 
     for (int i = first_path; i < argc; i++) {
         char msg[LOOGAL_PATH_MAX + 96];
@@ -161,7 +177,8 @@ int cmd_index(int argc, char **argv) {
     }
 
     printf("LOOGAL INDEX COMPLETE\n");
-    printf("  Mode              : %s\n", ctx.dry_run ? "dry-run" : (ctx.fresh ? "fresh rebuild" : "merge / non-destructive"));
+    printf("  Mode              : %s\n", ctx.dry_run ? "dry-run" : (ctx.fresh ? "fresh rebuild" : "bedrock merge / non-destructive"));
+    printf("  Records           : %s active projection, rebuilt from durable memory\n", LOOGAL_RECORDS_PATH);
     printf("  Files scanned     : %zu\n", ctx.scanned_files);
     printf("  Files skipped     : %zu\n", ctx.skipped_files);
     printf("  New identities    : %zu\n", ctx.memory.seen_new_identities);
