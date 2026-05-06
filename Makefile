@@ -102,3 +102,9 @@ test-native-ahash: $(BIN)
 	bash tests/test_native_ahash_backend.sh
 
 .PHONY: test-native-ahash
+
+
+test-shadow-search: $(BIN)
+	bash tests/test_shadow_search_engine.sh
+
+.PHONY: test-shadow-search

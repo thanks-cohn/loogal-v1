@@ -41,8 +41,15 @@ static int cmp_hit(const void *a, const void *b) {
     const Hit *ha = (const Hit *)a;
     const Hit *hb = (const Hit *)b;
 
+    if (ha->similarity < hb->similarity) return 1;
+    if (ha->similarity > hb->similarity) return -1;
+
     if (ha->hash_distance != hb->hash_distance) {
         return ha->hash_distance - hb->hash_distance;
+    }
+
+    if (ha->ahash_distance != hb->ahash_distance) {
+        return ha->ahash_distance - hb->ahash_distance;
     }
 
     return strcmp(ha->rec.path, hb->rec.path);
