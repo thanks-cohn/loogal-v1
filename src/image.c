@@ -19,6 +19,8 @@
 
 #define LOOGAL_DHASH_W 9
 #define LOOGAL_DHASH_H 8
+#define LOOGAL_AHASH_W 8
+#define LOOGAL_AHASH_H 8
 
 int image_is_supported(const char *path) {
     const char *e = file_extension(path);
@@ -113,6 +115,50 @@ static int make_dhash_from_gray(
     return 0;
 }
 
+
+static int make_ahash_from_gray(
+    const unsigned char *gray,
+    int width,
+    int height,
+    uint64_t *out_hash
+) {
+    if (!gray || width <= 0 || height <= 0 || !out_hash) return -1;
+
+    unsigned char small[LOOGAL_AHASH_W * LOOGAL_AHASH_H];
+    unsigned long sum = 0;
+
+    for (int y = 0; y < LOOGAL_AHASH_H; y++) {
+        for (int x = 0; x < LOOGAL_AHASH_W; x++) {
+            unsigned char v = sample_box_average(
+                gray,
+                width,
+                height,
+                x,
+                y,
+                LOOGAL_AHASH_W,
+                LOOGAL_AHASH_H
+            );
+
+            small[y * LOOGAL_AHASH_W + x] = v;
+            sum += v;
+        }
+    }
+
+    unsigned char avg = (unsigned char)(sum / (LOOGAL_AHASH_W * LOOGAL_AHASH_H));
+    uint64_t h = 0;
+
+    for (int i = 0; i < LOOGAL_AHASH_W * LOOGAL_AHASH_H; i++) {
+        h <<= 1;
+
+        if (small[i] > avg) {
+            h |= 1ULL;
+        }
+    }
+
+    *out_hash = h;
+    return 0;
+}
+
 int compute_dhash(const char *path, uint64_t *out_hash) {
     if (!path || !out_hash) return -1;
 
@@ -130,6 +176,29 @@ int compute_dhash(const char *path, uint64_t *out_hash) {
     }
 
     int rc = make_dhash_from_gray(gray, width, height, out_hash);
+
+    stbi_image_free(gray);
+
+    return rc;
+}
+
+int compute_ahash(const char *path, uint64_t *out_hash) {
+    if (!path || !out_hash) return -1;
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+
+    unsigned char *gray = stbi_load(path, &width, &height, &channels, 1);
+
+    if (!gray) {
+        char msg[512];
+        snprintf(msg, sizeof(msg), "stb decode failed: %.360s", path);
+        loogal_log("image.decode", "error", msg);
+        return -1;
+    }
+
+    int rc = make_ahash_from_gray(gray, width, height, out_hash);
 
     stbi_image_free(gray);
 
@@ -165,6 +234,10 @@ int image_probe(const char *path, LoogalImageInfo *out) {
     out->aspect = (float)width / (float)height;
 
     if (compute_dhash(path, &out->dhash) != 0) {
+        return -1;
+    }
+
+    if (compute_ahash(path, &out->ahash) != 0) {
         return -1;
     }
 

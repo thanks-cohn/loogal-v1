@@ -15,6 +15,7 @@
 typedef struct {
     uint64_t id;
     uint64_t dhash;
+    uint64_t ahash;
     char sha256[65];
     float aspect;
     uint64_t best_file_size;

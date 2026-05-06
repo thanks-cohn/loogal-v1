@@ -28,6 +28,7 @@ typedef struct {
 typedef struct {
     uint64_t id;
     uint64_t dhash;
+    uint64_t ahash;
     float aspect;
     uint64_t file_size;
     int32_t width;
@@ -42,6 +43,7 @@ typedef struct {
     int height;
     uint64_t file_size;
     uint64_t dhash;
+    uint64_t ahash;
     char sha256[65];
     float aspect;
     char ext[16];
@@ -60,6 +62,7 @@ int cmd_session(int argc, char **argv);
 int image_probe(const char *path, LoogalImageInfo *out);
 int image_is_supported(const char *path);
 int compute_dhash(const char *path, uint64_t *out_hash);
+int compute_ahash(const char *path, uint64_t *out_hash);
 int write_index_records(LoogalRecord *records, size_t count);
 int read_index_records(LoogalRecord **records, size_t *count);
 int hamming64(uint64_t a, uint64_t b);

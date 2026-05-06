@@ -96,3 +96,9 @@ test-shadow-core:
 	bash tests/test_shadow_core.sh
 
 .PHONY: test-shadow-core
+
+
+test-native-ahash: $(BIN)
+	bash tests/test_native_ahash_backend.sh
+
+.PHONY: test-native-ahash

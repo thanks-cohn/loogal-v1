@@ -147,6 +147,7 @@ int loogal_memory_load(LoogalMemory *m) {
             if (extract_u64_field(line, "id", &id.id) != 0) continue;
             extract_string_field(line, "sha256", id.sha256, sizeof(id.sha256));
             extract_u64_field(line, "dhash", &id.dhash);
+            extract_u64_field(line, "ahash", &id.ahash);
             extract_float_field(line, "aspect", &id.aspect);
             extract_u64_field(line, "best_file_size", &id.best_file_size);
             extract_i32_field(line, "width", &id.width);
@@ -190,9 +191,11 @@ static int write_identities_tmp(const LoogalMemory *m, const char *tmp) {
     if (!f) return -1;
     for (size_t i = 0; i < m->identity_count; i++) {
         const LoogalIdentity *id = &m->identities[i];
-        fprintf(f, "{\"id\":%llu,\"type\":\"visual.identity\",\"sha256\":\"%s\",\"dhash\":%llu,\"aspect\":%.6f,\"best_file_size\":%llu,\"width\":%d,\"height\":%d,\"location_count\":%llu,\"first_seen_unix\":%llu,\"last_seen_unix\":%llu}\n",
+        fprintf(f, "{\"id\":%llu,\"type\":\"visual.identity\",\"sha256\":\"%s\",\"dhash\":%llu,\"ahash\":%llu,\"aspect\":%.6f,\"best_file_size\":%llu,\"width\":%d,\"height\":%d,\"location_count\":%llu,\"first_seen_unix\":%llu,\"last_seen_unix\":%llu}\n",
                 (unsigned long long)id->id, id->sha256,
-                (unsigned long long)id->dhash, id->aspect,
+                (unsigned long long)id->dhash,
+                (unsigned long long)id->ahash,
+                id->aspect,
                 (unsigned long long)id->best_file_size, id->width, id->height,
                 (unsigned long long)id->location_count,
                 (unsigned long long)id->first_seen_unix,
@@ -254,6 +257,7 @@ int loogal_memory_ingest_image(LoogalMemory *m, const LoogalImageInfo *info) {
         id->id = next_identity_id(m);
         snprintf(id->sha256, sizeof(id->sha256), "%s", info->sha256);
         id->dhash = info->dhash;
+        id->ahash = info->ahash;
         id->aspect = info->aspect;
         id->best_file_size = info->file_size;
         id->width = info->width;
@@ -330,6 +334,7 @@ int loogal_memory_build_records(const LoogalMemory *m, LoogalRecord **out_record
         memset(r, 0, sizeof(*r));
         r->id = id->id;
         r->dhash = id->dhash;
+        r->ahash = id->ahash;
         r->aspect = id->aspect;
         r->file_size = loc->file_size;
         r->width = id->width;

@@ -44,13 +44,14 @@ static void write_compat_records_jsonl(const LoogalRecord *records, size_t count
     for (size_t i = 0; i < count; i++) {
         const LoogalRecord *r = &records[i];
         char *p = json_escape(r->path);
-        fprintf(f, "{\"id\":%llu,\"tool\":\"loogal\",\"type\":\"image_record\",\"path\":\"%s\",\"width\":%d,\"height\":%d,\"file_size_bytes\":%llu,\"dhash\":\"%016llx\",\"signature_engine\":\"dhash:v1\",\"projection\":\"active_memory:v1\"}\n",
+        fprintf(f, "{\"id\":%llu,\"tool\":\"loogal\",\"type\":\"image_record\",\"path\":\"%s\",\"width\":%d,\"height\":%d,\"file_size_bytes\":%llu,\"dhash\":\"%016llx\",\"ahash\":\"%016llx\",\"signature_engine\":\"dhash:v1+ahash:v1\",\"projection\":\"active_memory:v1\"}\n",
                 (unsigned long long)r->id,
                 p ? p : "",
                 r->width,
                 r->height,
                 (unsigned long long)r->file_size,
-                (unsigned long long)r->dhash);
+                (unsigned long long)r->dhash,
+                (unsigned long long)r->ahash);
         free(p);
     }
 
