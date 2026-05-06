@@ -108,3 +108,14 @@ test-shadow-search: $(BIN)
 	bash tests/test_shadow_search_engine.sh
 
 .PHONY: test-shadow-search
+
+
+check: $(BIN)
+	bash tests/test_delta_module.sh
+	bash tests/test_native_image_backend.sh
+	bash tests/test_native_ahash_backend.sh
+	bash tests/test_shadow_core.sh
+	bash tests/test_shadow_search_engine.sh
+	bash tests/test_native_similarity_backend.sh
+
+.PHONY: check
