@@ -243,7 +243,7 @@ int image_probe(const char *path, LoogalImageInfo *out) {
 
     /*
        TODO:
-       This still calls the current sha256 helper, which shells out to sha256sum.
+       This calls the native C SHA-256 helper.
        The ImageMagick dependency is gone from the image primitive.
        Next steel plate: replace hash.c with native C SHA-256.
     */

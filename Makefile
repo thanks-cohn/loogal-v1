@@ -125,3 +125,9 @@ test-bench-scan: $(BIN)
 	bash tests/test_bench_scan.sh
 
 .PHONY: test-bench-scan
+
+
+test-native-sha256:
+	bash tests/test_native_sha256.sh
+
+.PHONY: test-native-sha256
