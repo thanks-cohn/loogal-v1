@@ -43,12 +43,6 @@ static int arg_int(int argc, char **argv, const char *flag, int def) {
     return n > 0 ? n : def;
 }
 
-static int mkdir_if_needed(const char *p) {
-    if (mkdir(p, 0755) != 0 && errno != EEXIST) return -1;
-    return 0;
-}
-
-
 static uint64_t fnv1a64_bytes(const unsigned char *s, size_t n, uint64_t h) {
     for (size_t i = 0; i < n; i++) {
         h ^= (uint64_t)s[i];
@@ -151,7 +145,7 @@ static int create_one(const char *path, int size, int force, int dry_run, int as
         loogal_log("thumbnail", "error", "cannot read image");
         return 1;
     }
-    if (mkdir_if_needed("data") != 0 || mkdir_if_needed(THUMB_DIR) != 0) {
+    if (loogal_platform_mkdir("data") != 0 || loogal_platform_mkdir(THUMB_DIR) != 0) {
         fprintf(stderr, "[loogal:thumbnail_error] cannot create thumbnail cache directory\n");
         loogal_log("thumbnail", "error", "cannot create thumbnail cache directory");
         return 1;
