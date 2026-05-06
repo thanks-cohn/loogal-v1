@@ -45,3 +45,7 @@ data/logs/
 
 # Build artifacts
 *.o
+
+# Python cache files from test helpers
+__pycache__/
+*.pyc
