@@ -99,13 +99,17 @@ static int loogal_count_thumbnail_cache(const char *dir_path, int *out_count, ui
 }
 
 static uint64_t loogal_thumb_key(const char *path, int size) {
-    struct stat st;
+    uint64_t file_size = 0;
+    uint64_t file_mtime = 0;
     uint64_t h = 1469598103934665603ULL;
+
     h = fnv1a64_bytes((const unsigned char *)path, strlen(path), h);
-    if (stat(path, &st) == 0) {
-        h = fnv1a64_bytes((const unsigned char *)&st.st_size, sizeof(st.st_size), h);
-        h = fnv1a64_bytes((const unsigned char *)&st.st_mtime, sizeof(st.st_mtime), h);
+
+    if (loogal_platform_file_metadata(path, &file_size, &file_mtime) == 0) {
+        h = fnv1a64_bytes((const unsigned char *)&file_size, sizeof(file_size), h);
+        h = fnv1a64_bytes((const unsigned char *)&file_mtime, sizeof(file_mtime), h);
     }
+
     h = fnv1a64_bytes((const unsigned char *)&size, sizeof(size), h);
     return h;
 }

@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 int loogal_platform_file_size(const char *path, uint64_t *out_size);
+int loogal_platform_file_metadata(const char *path, uint64_t *out_size, uint64_t *out_mtime);
 int loogal_platform_file_exists(const char *path);
 int loogal_platform_file_readable(const char *path);
 int loogal_platform_mkdir(const char *path);

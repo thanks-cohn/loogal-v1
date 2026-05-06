@@ -31,6 +31,28 @@ int loogal_platform_file_readable(const char *path) {
     return access(path, R_OK) == 0 ? 1 : 0;
 }
 
+int loogal_platform_file_metadata(const char *path, uint64_t *out_size, uint64_t *out_mtime) {
+    if (!path || !out_size || !out_mtime) return -1;
+
+    struct stat st;
+
+    if (stat(path, &st) != 0) {
+        return -1;
+    }
+
+    if (!S_ISREG(st.st_mode)) {
+        return -1;
+    }
+
+    if (st.st_size < 0) {
+        return -1;
+    }
+
+    *out_size = (uint64_t)st.st_size;
+    *out_mtime = (uint64_t)st.st_mtime;
+    return 0;
+}
+
 int loogal_platform_file_size(const char *path, uint64_t *out_size) {
     if (!path || !out_size) return -1;
 
