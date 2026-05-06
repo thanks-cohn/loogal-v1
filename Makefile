@@ -84,3 +84,9 @@ test-native-image: $(BIN)
 	bash tests/test_native_image_backend.sh
 
 .PHONY: test-native-image
+
+
+test-native-similarity: $(BIN)
+	bash tests/test_native_similarity_backend.sh
+
+.PHONY: test-native-similarity
