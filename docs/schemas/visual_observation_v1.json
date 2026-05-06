@@ -1,0 +1,38 @@
+{
+  "schema": "loogal.visual_observation.v1",
+  "producer": {
+    "tool": "loogal",
+    "version": "0.1"
+  },
+  "source": {
+    "kind": "image",
+    "path": "",
+    "container_sha256": null,
+    "page": null
+  },
+  "region": {
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0
+  },
+  "asset": {
+    "kind": "whole_image",
+    "temporary_path": null,
+    "retain": true,
+    "width": 0,
+    "height": 0
+  },
+  "fingerprints": {
+    "sha256": "",
+    "ahash": "",
+    "dhash": "",
+    "edgehash": null,
+    "tilehashes": []
+  },
+  "identity": {
+    "identity_id": null,
+    "confidence": null
+  },
+  "evidence": []
+}
