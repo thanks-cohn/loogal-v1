@@ -100,6 +100,11 @@ rc = cmd_learn(argc - 2, argv + 2);
 return finish_command(cmd, rc, start_ms);
 }
 
+
+    if (strcmp(cmd, "bench-scan") == 0) {
+        return cmd_bench_scan(argc, argv);
+    }
+
 if (strcmp(cmd, "bench") == 0) {
 rc = cmd_bench(argc - 2, argv + 2);
 return finish_command(cmd, rc, start_ms);

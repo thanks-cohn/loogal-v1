@@ -73,4 +73,5 @@ char *json_escape(const char *s);
 long now_unix(void);
 void iso_time_now(char *buf, size_t n);
 
+int cmd_bench_scan(int argc, char **argv);
 #endif

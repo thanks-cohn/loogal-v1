@@ -119,3 +119,9 @@ check: $(BIN)
 	bash tests/test_native_similarity_backend.sh
 
 .PHONY: check
+
+
+test-bench-scan: $(BIN)
+	bash tests/test_bench_scan.sh
+
+.PHONY: test-bench-scan
