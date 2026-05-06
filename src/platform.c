@@ -9,6 +9,18 @@
 #include <time.h>
 #include <unistd.h>
 
+int loogal_platform_dir_exists(const char *path) {
+    if (!path || !path[0]) return 0;
+
+    struct stat st;
+
+    if (stat(path, &st) != 0) {
+        return 0;
+    }
+
+    return S_ISDIR(st.st_mode) ? 1 : 0;
+}
+
 int loogal_platform_file_exists(const char *path) {
     if (!path || !path[0]) return 0;
 

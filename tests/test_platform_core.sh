@@ -24,6 +24,10 @@ int main(void) {
         return fail("mkdir failed");
     }
 
+    if (!loogal_platform_dir_exists(dir)) {
+        return fail("dir_exists failed");
+    }
+
     FILE *f = fopen(src, "wb");
     if (!f) return fail("could not create source file");
 

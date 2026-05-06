@@ -238,11 +238,10 @@ int cmd_bench_scan(int argc, char **argv) {
 
     const char *target = argv[2];
 
-    struct stat root_st;
-    if (stat(target, &root_st) != 0 || !S_ISDIR(root_st.st_mode)) {
-        fprintf(stderr, "[loogal:bench_scan_error] not a readable directory: %s\n", target);
-        return 1;
-    }
+if (!loogal_platform_dir_exists(target)) {
+fprintf(stderr, "[loogal:bench_scan_error] not a readable directory: %s\n", target);
+return 1;
+}
 
     BenchScanStats st;
     memset(&st, 0, sizeof(st));
