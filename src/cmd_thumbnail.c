@@ -86,13 +86,11 @@ static int loogal_count_thumbnail_cache(const char *dir_path, int *out_count, ui
             continue;
         }
 
-        struct stat st;
+        uint64_t file_bytes = 0;
 
-        if (stat(path, &st) == 0 && S_ISREG(st.st_mode)) {
+        if (loogal_platform_file_size(path, &file_bytes) == 0) {
             (*out_count)++;
-            if (st.st_size > 0) {
-                *out_bytes += (uint64_t)st.st_size;
-            }
+            *out_bytes += file_bytes;
         }
     }
 
