@@ -508,14 +508,13 @@ int cmd_search(int argc, char **argv) {
         print_human_results(query_path, place_filter, min_percent, candidate_count, hcount, hits, offset, limit, elapsed_ms);
     }
 
-    char msg[512];
-
-    snprintf(
-        msg,
-        sizeof(msg),
+    const char *place_label = place_filter[0] ? place_filter : "memory";
+    int msg_len = snprintf(
+        NULL,
+        0,
         "query=%.180s place=%.180s min=%.3f candidates=%zu hits=%zu limit=%zu offset=%zu json=%d duration_ms=%.3f engine=binary_index:dhash:v1 identity_expansion=locations.jsonl:v1",
         query_path,
-        place_filter[0] ? place_filter : "memory",
+        place_label,
         min_percent,
         candidate_count,
         hcount,
@@ -525,7 +524,31 @@ int cmd_search(int argc, char **argv) {
         elapsed_ms
     );
 
-    loogal_log("search.complete", "ok", msg);
+    if (msg_len > 0) {
+        char *msg = malloc((size_t)msg_len + 1);
+        if (msg) {
+            snprintf(
+                msg,
+                (size_t)msg_len + 1,
+                "query=%.180s place=%.180s min=%.3f candidates=%zu hits=%zu limit=%zu offset=%zu json=%d duration_ms=%.3f engine=binary_index:dhash:v1 identity_expansion=locations.jsonl:v1",
+                query_path,
+                place_label,
+                min_percent,
+                candidate_count,
+                hcount,
+                limit,
+                offset,
+                as_json,
+                elapsed_ms
+            );
+            loogal_log("search.complete", "ok", msg);
+            free(msg);
+        } else {
+            loogal_log("search.complete", "ok", "search completed; log message allocation failed");
+        }
+    } else {
+        loogal_log("search.complete", "ok", "search completed");
+    }
 
     free(hits);
     free(records);
