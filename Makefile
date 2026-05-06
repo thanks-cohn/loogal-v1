@@ -147,3 +147,8 @@ check-core-noshell:
 	! grep -n -F "system(" src/hash.c src/image.c src/index.c src/memory.c src/cmd_index.c src/cmd_search.c src/cmd_stats.c src/cmd_bench_scan.c src/verify.c src/why.c src/core/*.c include/*.h include/loogal/*.h
 
 .PHONY: check-core-noshell
+
+test-platform-core:
+	bash tests/test_platform_core.sh
+
+.PHONY: test-platform-core
