@@ -1,70 +1,104 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+cc="${CC:-gcc}"
 
-cat > /tmp/loogal_delta_test.c <<'C_EOF'
-#include "loogal/delta.h"
+tmp_c="$(mktemp /tmp/loogal_delta_test.XXXXXX.c)"
+tmp_bin="$(mktemp /tmp/loogal_delta_test.XXXXXX)"
 
+cleanup() {
+  rm -f "$tmp_c" "$tmp_bin"
+}
+trap cleanup EXIT
+
+cat > "$tmp_c" <<'C_EOF'
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <math.h>
 
-static int fail(const char *msg) {
-    fprintf(stderr, "FAIL: %s\n", msg);
-    return 1;
+#include "loogal/delta.h"
+
+static int almost_equal(double a, double b) {
+    double d = a - b;
+    if (d < 0) d = -d;
+    return d < 0.0001;
 }
 
 int main(void) {
-    uint64_t canonical = 0xf0f0f0f0f0f0f0f0ULL;
-    uint64_t variant_one_bit = canonical ^ (1ULL << 7);
-    uint64_t variant_many_bits = canonical ^ 0x00ff00ff00ff00ffULL;
+    uint64_t same_a = 0xAAAAAAAAAAAAAAAAULL;
+    uint64_t same_b = 0xAAAAAAAAAAAAAAAAULL;
 
-    LoogalDelta64 d1;
-    LoogalDelta64 d2;
+    uint64_t one_bit_a = 0xAAAAAAAAAAAAAAAAULL;
+    uint64_t one_bit_b = 0xAAAAAAAAAAAAAAABULL;
 
-    if (loogal_delta64_make(canonical, variant_one_bit, &d1) != 0) {
-        return fail("could not make one-bit delta");
+    uint64_t many_a = 0x0000000000000000ULL;
+    uint64_t many_b = 0xFFFFFFFFFFFFFFFFULL;
+
+    unsigned d0 = loogal_delta_hamming_u64(same_a, same_b);
+    if (d0 != 0) {
+        fprintf(stderr, "exact distance failed: got %u\n", d0);
+        return 1;
     }
+    printf("[delta] exact match passed\n");
 
-    if (d1.distance != 1) {
-        return fail("one-bit delta distance should be 1");
+    unsigned d1 = loogal_delta_hamming_u64(one_bit_a, one_bit_b);
+    if (d1 != 1) {
+        fprintf(stderr, "one-bit distance failed: got %u\n", d1);
+        return 1;
     }
+    printf("[delta] one-bit distance passed\n");
 
-    if (d1.mode != LOOGAL_DELTA_BITPOS_U64) {
-        return fail("one-bit delta should use bit positions");
+    unsigned d64 = loogal_delta_hamming_u64(many_a, many_b);
+    if (d64 != 64) {
+        fprintf(stderr, "many-bit distance failed: got %u\n", d64);
+        return 1;
     }
+    printf("[delta] many-bit distance passed\n");
 
-    if (loogal_delta64_hydrate(canonical, &d1) != variant_one_bit) {
-        return fail("one-bit hydration mismatch");
+    double exact_sim = loogal_delta_similarity_u64(same_a, same_b);
+    if (!almost_equal(exact_sim, 100.0)) {
+        fprintf(stderr, "exact similarity failed: got %.4f\n", exact_sim);
+        return 1;
     }
+    printf("[delta] exact similarity passed\n");
 
-    if (loogal_delta64_make(canonical, variant_many_bits, &d2) != 0) {
-        return fail("could not make many-bit delta");
+    double one_bit_sim = loogal_delta_similarity_u64(one_bit_a, one_bit_b);
+    if (!almost_equal(one_bit_sim, 98.4375)) {
+        fprintf(stderr, "one-bit similarity failed: got %.4f\n", one_bit_sim);
+        return 1;
     }
+    printf("[delta] one-bit similarity passed\n");
 
-    if (d2.distance <= 8) {
-        return fail("many-bit delta distance unexpectedly small");
+    bool should_match = loogal_delta_match_u64(one_bit_a, one_bit_b, 98.0);
+    if (!should_match) {
+        fprintf(stderr, "threshold match failed\n");
+        return 1;
     }
+    printf("[delta] threshold match passed\n");
 
-    if (d2.mode != LOOGAL_DELTA_XOR_U64) {
-        return fail("many-bit delta should use xor mode");
+    bool should_not_match = loogal_delta_match_u64(many_a, many_b, 1.0);
+    if (should_not_match) {
+        fprintf(stderr, "threshold rejection failed\n");
+        return 1;
     }
+    printf("[delta] threshold rejection passed\n");
 
-    if (loogal_delta64_hydrate(canonical, &d2) != variant_many_bits) {
-        return fail("many-bit hydration mismatch");
+    loogal_delta_result r = loogal_delta_compare_u64(one_bit_a, one_bit_b);
+    if (r.distance != 1 || r.exact || !almost_equal(r.similarity, 98.4375)) {
+        fprintf(stderr, "delta result struct failed\n");
+        return 1;
     }
+    printf("[delta] result struct passed\n");
 
-    printf("DELTA MODULE TEST OK\n");
-    printf("  one-bit mode : %s distance=%u\n", loogal_delta_mode_name(d1.mode), d1.distance);
-    printf("  many-bit mode: %s distance=%u\n", loogal_delta_mode_name(d2.mode), d2.distance);
-
+    printf("[delta] all tests passed\n");
     return 0;
 }
 C_EOF
 
-cc -O2 -Wall -Wextra -std=c11 -Iinclude \
-  /tmp/loogal_delta_test.c src/core/delta.c \
-  -o /tmp/loogal_delta_test
+"$cc" -std=c11 -Wall -Wextra -Werror \
+  -Iinclude \
+  "$tmp_c" src/core/delta.c \
+  -o "$tmp_bin"
 
-/tmp/loogal_delta_test
+"$tmp_bin"

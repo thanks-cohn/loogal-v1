@@ -2,27 +2,30 @@
 #define LOOGAL_DELTA_H
 
 #include <stdint.h>
-#include <stddef.h>
+#include <stdbool.h>
 
-typedef enum {
-    LOOGAL_DELTA_FULL_U64 = 1,
-    LOOGAL_DELTA_XOR_U64 = 2,
-    LOOGAL_DELTA_BITPOS_U64 = 3
-} LoogalDeltaMode;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
-    LoogalDeltaMode mode;
-    uint64_t value;
-    uint8_t distance;
-    uint8_t bit_count;
-    uint8_t bits[64];
-} LoogalDelta64;
+    uint64_t a;
+    uint64_t b;
+    unsigned distance;
+    double similarity;
+    bool exact;
+} loogal_delta_result;
 
-int loogal_popcount64(uint64_t value);
-uint64_t loogal_delta_xor64(uint64_t canonical, uint64_t variant);
-uint64_t loogal_delta_apply_xor64(uint64_t canonical, uint64_t delta);
-int loogal_delta64_make(uint64_t canonical, uint64_t variant, LoogalDelta64 *out);
-uint64_t loogal_delta64_hydrate(uint64_t canonical, const LoogalDelta64 *delta);
-const char *loogal_delta_mode_name(LoogalDeltaMode mode);
+unsigned loogal_delta_hamming_u64(uint64_t a, uint64_t b);
+
+double loogal_delta_similarity_u64(uint64_t a, uint64_t b);
+
+bool loogal_delta_match_u64(uint64_t a, uint64_t b, double threshold_percent);
+
+loogal_delta_result loogal_delta_compare_u64(uint64_t a, uint64_t b);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
