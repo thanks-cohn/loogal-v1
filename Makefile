@@ -1,6 +1,7 @@
 CC ?= gcc
 CFLAGS ?= -O3 -Wall -Wextra -std=c11 -Iinclude
 LDFLAGS ?=
+LDLIBS ?= -lm
 SRC := $(wildcard src/*.c) $(wildcard src/core/*.c)
 OBJ := $(SRC:.c=.o)
 BIN := loogal
@@ -8,10 +9,10 @@ BIN := loogal
 all: $(BIN)
 
 $(BIN): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS) $(LDLIBS)
 
 clean:
-	rm -f src/*.o $(BIN)
+	rm -f src/*.o src/core/*.o $(BIN)
 
 safe-clean: clean
 	@echo "Preserving data/, logs/, manifests/"
@@ -77,3 +78,9 @@ test-delta:
 	bash tests/test_delta_module.sh
 
 .PHONY: test-delta
+
+
+test-native-image: $(BIN)
+	bash tests/test_native_image_backend.sh
+
+.PHONY: test-native-image
