@@ -159,7 +159,7 @@ static int create_one(const char *path, int size, int force, int dry_run, int as
     if (!dry_run && will_create) {
     /*
         Zero-dependency fallback:
-        We no longer shell out to ImageMagick here.
+        We no longer shell out to external image tooling here.
 
         For now, thumbnail cache creation copies the source image bytes into
         the thumbnail cache path. This preserves GUI/cache plumbing without

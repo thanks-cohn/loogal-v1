@@ -131,3 +131,12 @@ test-native-sha256:
 	bash tests/test_native_sha256.sh
 
 .PHONY: test-native-sha256
+
+
+check-release-core:
+	! grep -R "magick" -n src include tests --exclude='*.o'
+	! grep -R "sha256sum" -n src include --exclude='*.o'
+	! grep -R "python" -n src include --exclude='*.o'
+	! grep -R "ImageMagick" -n src include tests --exclude='*.o'
+
+.PHONY: check-release-core
