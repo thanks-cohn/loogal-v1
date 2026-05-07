@@ -2,20 +2,13 @@
 
 #include "loogal/watch_mutation.h"
 #include "loogal/watch_daemon.h"
+#include "loogal/index_service.h"
 #include "loogal.h"
 #include "memory.h"
 
 #include <stdio.h>
 #include <string.h>
 
-static int load_memory_or_die(LoogalMemory *m) {
-    if (loogal_memory_load(m) != 0) {
-        loogal_log("watch_mutation.memory", "error", "failed loading memory");
-        return 1;
-    }
-
-    return 0;
-}
 
 int loogal_watch_handle_created(const char *path) {
     if (!path || !path[0]) {
@@ -25,14 +18,8 @@ int loogal_watch_handle_created(const char *path) {
 
     loogal_log("watch_mutation.created", "ok", path);
 
-    /*
-     * future:
-     * probe image
-     * ingest identity
-     * patch projection/index
-     */
-
-    return 0;
+    LoogalIndexOneResult result;
+    return loogal_index_one_path(path, 0, 0, &result);
 }
 
 int loogal_watch_handle_modified(const char *path) {
@@ -43,14 +30,8 @@ int loogal_watch_handle_modified(const char *path) {
 
     loogal_log("watch_mutation.modified", "ok", path);
 
-    /*
-     * future:
-     * reprobe image
-     * detect identity drift
-     * append mutation event
-     */
-
-    return 0;
+    LoogalIndexOneResult result;
+    return loogal_index_one_path(path, 0, 0, &result);
 }
 
 int loogal_watch_handle_deleted(const char *path) {
