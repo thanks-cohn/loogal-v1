@@ -174,3 +174,112 @@ int cmd_hash_v0(int argc, char **argv) {
     LOOGAL_INFO("hash_v0", "computed", path, "computed ImageMagick-compatible v0 dHash");
     return 0;
 }
+
+
+int cmd_hash_v0_grid(int argc, char **argv) {
+    if (argc < 1 || strcmp(argv[0], "help") == 0 || strcmp(argv[0], "--help") == 0) {
+        puts("Usage: loogal hash-v0-grid <image> --json");
+        return 0;
+    }
+
+    const char *path = argv[0];
+    int as_json = loogal_has_flag(argc, argv, "--json");
+
+    unsigned char px[9 * 8];
+
+    char q[LOOGAL_PATH_MAX * 2];
+    if (quote_sh(path, q, sizeof(q)) != 0) return 1;
+
+    char cmd[LOOGAL_PATH_MAX * 3];
+    int n = snprintf(cmd, sizeof(cmd),
+                     "magick %s -auto-orient -resize 9x8! -colorspace Gray -depth 8 gray:- 2>/dev/null",
+                     q);
+    if (n < 0 || n >= (int)sizeof(cmd)) return 1;
+
+    FILE *p = popen(cmd, "r");
+    if (!p) return 1;
+
+    size_t got = fread(px, 1, sizeof(px), p);
+    int rc = pclose(p);
+
+    if (got != sizeof(px) || rc != 0) return 1;
+
+    if (as_json) {
+        puts("{");
+        printf("  "); loogal_json_kv_string(stdout, "tool", "loogal", 1);
+        printf("  "); loogal_json_kv_string(stdout, "type", "hash.v0.grid", 1);
+        printf("  "); loogal_json_kv_string(stdout, "path", path, 1);
+        printf("  \"width\": 9,\n");
+        printf("  \"height\": 8,\n");
+        printf("  \"bytes\": [");
+        for (int i = 0; i < 72; i++) {
+            if (i) printf(",");
+            printf("%u", (unsigned)px[i]);
+        }
+        printf("]\n");
+        puts("}");
+    } else {
+        puts("[loogal:hash_v0_grid]");
+        for (int y = 0; y < 8; y++) {
+            printf("  ");
+            for (int x = 0; x < 9; x++) {
+                printf("%3u%s", (unsigned)px[y * 9 + x], x == 8 ? "" : " ");
+            }
+            putchar('\n');
+        }
+    }
+
+    return 0;
+}
+
+
+int cmd_hash_compare(int argc, char **argv) {
+    if (argc < 1 || strcmp(argv[0], "help") == 0 || strcmp(argv[0], "--help") == 0) {
+        puts("Usage: loogal hash-compare <image> --json");
+        return 0;
+    }
+
+    const char *path = argv[0];
+    int as_json = loogal_has_flag(argc, argv, "--json");
+
+    uint64_t v0 = 0;
+    uint64_t native = 0;
+
+    if (magick_v0_dhash(path, &v0) != 0) {
+        fprintf(stderr, "[loogal:hash_compare_error] v0 Magick hash failed: %s\n", path);
+        return 1;
+    }
+
+    if (compute_dhash(path, &native) != 0) {
+        fprintf(stderr, "[loogal:hash_compare_error] native hash failed: %s\n", path);
+        return 1;
+    }
+
+    int dist = hamming64_local(v0, native);
+    int matching = 64 - dist;
+    double similarity = (double)matching / 64.0;
+
+    if (as_json) {
+        puts("{");
+        printf("  "); loogal_json_kv_string(stdout, "tool", "loogal", 1);
+        printf("  "); loogal_json_kv_string(stdout, "type", "hash.compare", 1);
+        printf("  "); loogal_json_kv_string(stdout, "path", path, 1);
+        printf("  \"v0_dhash_hex\": \"0x%016llx\",\n", (unsigned long long)v0);
+        printf("  \"native_dhash_hex\": \"0x%016llx\",\n", (unsigned long long)native);
+        printf("  \"hamming_distance\": %d,\n", dist);
+        printf("  \"matching_bits\": %d,\n", matching);
+        printf("  \"similarity\": %.6f,\n", similarity);
+        printf("  \"similarity_percent\": %.3f\n", similarity * 100.0);
+        puts("}");
+    } else {
+        printf("[loogal:hash_compare]\n");
+        printf("  path:              %s\n", path);
+        printf("  v0_dhash:          0x%016llx\n", (unsigned long long)v0);
+        printf("  native_dhash:      0x%016llx\n", (unsigned long long)native);
+        printf("  hamming_distance:  %d\n", dist);
+        printf("  matching_bits:     %d / 64\n", matching);
+        printf("  similarity:        %.3f%%\n", similarity * 100.0);
+    }
+
+    return 0;
+}
