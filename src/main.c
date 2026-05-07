@@ -18,6 +18,7 @@
 #include "ingest.h"
 #include "loogal/watch_config.h"
 #include "loogal/watch_run.h"
+#include "loogal/watch_event.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -80,6 +81,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "watch-add")) return loogal_cmd_watch_add(argc, argv);
     if (!strcmp(cmd, "watch-list")) return loogal_cmd_watch_list(argc, argv);
     if (!strcmp(cmd, "watch-run")) return loogal_cmd_watch_run(argc, argv);
+    if (!strcmp(cmd, "watch-event")) return loogal_cmd_watch_event(argc, argv);
     if (!strcmp(cmd, "watch-remove")) return loogal_cmd_watch_remove(argc, argv);
     if (!strcmp(cmd, "watch-enable")) return loogal_cmd_watch_enable(argc, argv);
     if (!strcmp(cmd, "watch-disable")) return loogal_cmd_watch_disable(argc, argv);
