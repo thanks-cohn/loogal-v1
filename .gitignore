@@ -79,3 +79,6 @@ releases/*.exe
 !include/
 !include/loogal/
 !include/loogal/*.h
+
+# local Loogal memory / personal indexed data
+data/
