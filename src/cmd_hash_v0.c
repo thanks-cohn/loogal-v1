@@ -2,6 +2,7 @@
 #include "loogal.h"
 #include "jsonout.h"
 #include "hash_v0.h"
+#include "hash.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -279,6 +280,48 @@ int cmd_hash_compare(int argc, char **argv) {
         printf("  hamming_distance:  %d\n", dist);
         printf("  matching_bits:     %d / 64\n", matching);
         printf("  similarity:        %.3f%%\n", similarity * 100.0);
+    }
+
+    return 0;
+}
+
+
+int image_probe_v0(const char *path, LoogalImageInfo *out) {
+    if (!path || !out) return -1;
+    if (!image_is_supported(path)) return -1;
+
+    memset(out, 0, sizeof(*out));
+
+    snprintf(out->path, sizeof(out->path), "%s", path);
+    snprintf(out->ext, sizeof(out->ext), "%s", file_extension(path));
+
+    out->file_size = file_size_bytes(path);
+
+    int width = 0;
+    int height = 0;
+
+    if (magick_identify_dimensions(path, &width, &height) != 0) {
+        return -1;
+    }
+
+    out->width = width;
+    out->height = height;
+    out->aspect = (float)width / (float)height;
+
+    if (magick_v0_dhash(path, &out->dhash) != 0) {
+        return -1;
+    }
+
+    /*
+     * v0 compatibility means dHash follows old Loogal/ImageMagick exactly.
+     * aHash remains native for now as an auxiliary/tie-breaker signal.
+     */
+    if (compute_ahash(path, &out->ahash) != 0) {
+        return -1;
+    }
+
+    if (loogal_sha256_file(path, out->sha256) != 0) {
+        memset(out->sha256, 0, sizeof(out->sha256));
     }
 
     return 0;

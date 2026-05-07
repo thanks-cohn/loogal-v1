@@ -64,6 +64,7 @@ int cmd_thumbnail(int argc, char **argv);
 int cmd_action(int argc, char **argv);
 int cmd_session(int argc, char **argv);
 int image_probe(const char *path, LoogalImageInfo *out);
+int image_probe_v0(const char *path, LoogalImageInfo *out);
 int image_is_supported(const char *path);
 int compute_dhash(const char *path, uint64_t *out_hash);
 int compute_ahash(const char *path, uint64_t *out_hash);

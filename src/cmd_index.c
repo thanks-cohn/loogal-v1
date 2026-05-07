@@ -14,6 +14,7 @@ typedef struct {
     size_t skipped_files;
     int fresh;
     int dry_run;
+int hash_mode_v0;
 } LoogalIndexContext;
 
 static LoogalIndexContext *g_ctx = NULL;
@@ -58,27 +59,45 @@ static void write_compat_records_jsonl(const LoogalRecord *records, size_t count
     fclose(f);
 }
 
-static int parse_flags(int argc, char **argv, int *fresh, int *dry_run, int *first_path) {
-    *fresh = 0;
-    *dry_run = 0;
-    *first_path = 0;
+static int parse_flags(int argc, char **argv, int *fresh, int *dry_run, int *hash_mode_v0, int *first_path) {
+*fresh = 0;
+*dry_run = 0;
+*hash_mode_v0 = 0;
+*first_path = 0;
 
-    for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "--fresh") == 0) {
-            *fresh = 1;
-        } else if (strcmp(argv[i], "--dry-run") == 0) {
-            *dry_run = 1;
-        } else if (argv[i][0] == '-') {
-            char msg[256];
-            snprintf(msg, sizeof(msg), "unknown index flag: %s", argv[i]);
-            loogal_die("index.flags", msg);
-            return -1;
-        } else {
-            *first_path = i;
-            return 0;
-        }
-    }
-    return 0;
+for (int i = 0; i < argc; i++) {
+if (strcmp(argv[i], "--fresh") == 0) {
+*fresh = 1;
+} else if (strcmp(argv[i], "--dry-run") == 0) {
+*dry_run = 1;
+} else if (strcmp(argv[i], "--hash-mode") == 0) {
+if (i + 1 >= argc) {
+loogal_die("index.flags", "missing value after --hash-mode");
+return -1;
+}
+
+i++;
+
+if (strcmp(argv[i], "v0") == 0 || strcmp(argv[i], "magick-v0") == 0) {
+*hash_mode_v0 = 1;
+} else if (strcmp(argv[i], "native") == 0) {
+*hash_mode_v0 = 0;
+} else {
+loogal_die("index.flags", "unknown --hash-mode value; use native or v0");
+return -1;
+}
+} else if (argv[i][0] == '-') {
+char msg[256];
+snprintf(msg, sizeof(msg), "unknown index flag: %s", argv[i]);
+loogal_die("index.flags", msg);
+return -1;
+} else {
+*first_path = i;
+return 0;
+}
+}
+
+return 0;
 }
 
 static int visitor(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
@@ -91,7 +110,7 @@ static int visitor(const char *fpath, const struct stat *sb, int typeflag, struc
     g_ctx->scanned_files++;
 
     LoogalImageInfo info;
-    if (image_probe(fpath, &info) == 0) {
+    if ((g_ctx->hash_mode_v0 ? image_probe_v0(fpath, &info) : image_probe(fpath, &info)) == 0) {
         if (!g_ctx->dry_run) {
             loogal_memory_ingest_image(&g_ctx->memory, &info);
         }
@@ -125,7 +144,7 @@ int cmd_index(int argc, char **argv) {
     g_ctx = &ctx;
 
     int first_path = 0;
-    if (parse_flags(argc, argv, &ctx.fresh, &ctx.dry_run, &first_path) != 0) return 1;
+    if (parse_flags(argc, argv, &ctx.fresh, &ctx.dry_run, &ctx.hash_mode_v0, &first_path) != 0) return 1;
     if (first_path >= argc) {
         loogal_die("index", "usage: loogal index [--fresh] [--dry-run] <directories...>");
         return 1;

@@ -448,6 +448,7 @@ int cmd_search(int argc, char **argv) {
     LoogalSearchEngine engine = LOOGAL_SEARCH_ENGINE_DHASH;
     size_t limit = 10;
     size_t offset = 0;
+int hash_mode_v0 = 0;
     int as_json = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -504,7 +505,22 @@ int cmd_search(int argc, char **argv) {
             continue;
         }
 
-        if (is_numberish(a)) {
+        if (strcmp(a, "--hash-mode") == 0 && i + 1 < argc) {
+const char *mode = argv[++i];
+
+if (strcmp(mode, "v0") == 0 || strcmp(mode, "magick-v0") == 0) {
+hash_mode_v0 = 1;
+} else if (strcmp(mode, "native") == 0) {
+hash_mode_v0 = 0;
+} else {
+loogal_die("search", "unknown --hash-mode value; use native or v0");
+return 1;
+}
+
+continue;
+}
+
+if (is_numberish(a)) {
             min_percent = atof(a);
             continue;
         }
@@ -525,7 +541,7 @@ int cmd_search(int argc, char **argv) {
 
     LoogalImageInfo query;
 
-    if (image_probe(query_arg, &query) != 0) {
+    if ((hash_mode_v0 ? image_probe_v0(query_arg, &query) : image_probe(query_arg, &query)) != 0) {
         loogal_die("search", "could not read query image");
         return 1;
     }
