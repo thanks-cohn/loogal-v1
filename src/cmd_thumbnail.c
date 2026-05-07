@@ -7,8 +7,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <sys/stat.h>
-#include <errno.h>
-#include <dirent.h>
 #include <unistd.h>
 
 #define THUMB_DIR "data/thumbnails"
@@ -52,50 +50,43 @@ static uint64_t fnv1a64_bytes(const unsigned char *s, size_t n, uint64_t h) {
 }
 
 
+typedef struct {
+int *out_count;
+uint64_t *out_bytes;
+} LoogalThumbCacheCountCtx;
+
+static int loogal_count_thumbnail_cache_cb(const LoogalPlatformWalkEntry *entry, void *user) {
+if (!entry || !user) return -1;
+
+LoogalThumbCacheCountCtx *ctx = (LoogalThumbCacheCountCtx *)user;
+
+if (!ctx->out_count || !ctx->out_bytes) return -1;
+
+if (entry->type != LOOGAL_PLATFORM_ENTRY_FILE) {
+return 0;
+}
+
+(*ctx->out_count)++;
+*ctx->out_bytes += entry->size;
+
+return 0;
+}
+
 static int loogal_count_thumbnail_cache(const char *dir_path, int *out_count, uint64_t *out_bytes) {
-    if (!dir_path || !out_count || !out_bytes) return -1;
+if (!dir_path || !out_count || !out_bytes) return -1;
 
-    *out_count = 0;
-    *out_bytes = 0;
+*out_count = 0;
+*out_bytes = 0;
 
-    DIR *dir = opendir(dir_path);
-    if (!dir) {
-        return 0;
-    }
+if (!loogal_platform_dir_exists(dir_path)) {
+return 0;
+}
 
-    for (;;) {
-        errno = 0;
-        struct dirent *ent = readdir(dir);
+LoogalThumbCacheCountCtx ctx;
+ctx.out_count = out_count;
+ctx.out_bytes = out_bytes;
 
-        if (!ent) {
-            if (errno != 0) {
-                closedir(dir);
-                return -1;
-            }
-            break;
-        }
-
-        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) {
-            continue;
-        }
-
-        char path[LOOGAL_PATH_MAX * 2];
-        int n = snprintf(path, sizeof(path), "%s/%s", dir_path, ent->d_name);
-
-        if (n < 0 || n >= (int)sizeof(path)) {
-            continue;
-        }
-
-        uint64_t file_bytes = 0;
-
-        if (loogal_platform_file_size(path, &file_bytes) == 0) {
-            (*out_count)++;
-            *out_bytes += file_bytes;
-        }
-    }
-
-    closedir(dir);
-    return 0;
+return loogal_platform_walk(dir_path, loogal_count_thumbnail_cache_cb, &ctx);
 }
 
 static uint64_t loogal_thumb_key(const char *path, int size) {
