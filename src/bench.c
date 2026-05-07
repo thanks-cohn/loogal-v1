@@ -1,17 +1,26 @@
 #include "bench.h"
 #include "jsonout.h"
 #include "loogal.h"
+#include "loogal/platform.h"
 #include "timer.h"
+#include <limits.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <sys/stat.h>
 
 #define LOOGAL_INDEX_HEADER_BYTES 28
 
 static long bench_file_size(const char *path) {
-    struct stat st;
-    if (stat(path, &st) != 0) return -1;
-    return (long)st.st_size;
+uint64_t size = 0;
+
+if (loogal_platform_file_size(path, &size) != 0) {
+return -1;
+}
+
+if (size > (uint64_t)LONG_MAX) {
+return -1;
+}
+
+return (long)size;
 }
 
 int cmd_bench(int argc, char **argv) {
