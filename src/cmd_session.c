@@ -88,29 +88,6 @@ static int shell_quote(const char *in, char *out, size_t out_sz) {
     return 0;
 }
 
-static int copy_stream_to_file(FILE *in, const char *path, size_t *bytes_out) {
-    FILE *out = fopen(path, "wb");
-    if (!out) return -1;
-    char buf[8192];
-    size_t total = 0;
-    while (!feof(in)) {
-        size_t n = fread(buf, 1, sizeof(buf), in);
-        if (n > 0) {
-            if (fwrite(buf, 1, n, out) != n) {
-                fclose(out);
-                return -1;
-            }
-            total += n;
-        }
-        if (ferror(in)) {
-            fclose(out);
-            return -1;
-        }
-    }
-    if (fclose(out) != 0) return -1;
-    if (bytes_out) *bytes_out = total;
-    return 0;
-}
 
 static int write_meta_file(const char *meta_path,
                            const char *id,
@@ -380,23 +357,40 @@ static int cmd_session_create(int argc, char **argv) {
         return 1;
     }
 
-    FILE *pipe = popen(command, "r");
-    if (!pipe) {
-        loogal_log("session", "error", "failed to run search command");
-        return 1;
-    }
-    size_t bytes = 0;
-    int copy_rc = copy_stream_to_file(pipe, results_path, &bytes);
-    int close_rc = pclose(pipe);
-    if (copy_rc != 0 || close_rc != 0) {
-        loogal_log("session", "error", "search command failed while creating session");
+    LoogalSessionCreateResult direct;
+
+    if (loogal_session_create_direct(
+            a.query,
+            a.place,
+            a.memory,
+            a.min_percent,
+            a.limit,
+            a.offset,
+            &direct
+        ) != 0) {
+
+        LOOGAL_ERROR(LOOGAL_ERR_CMD_OPERATION_FAILED,
+                     "session",
+                     "create_direct",
+                     a.query,
+                     "direct session create failed");
+
+        loogal_log("session", "error", "direct session create failed");
         return 1;
     }
 
-    if (write_meta_file(meta_path, id, &a, results_path, command) != 0) {
-        loogal_log("session", "error", "failed to write session meta");
-        return 1;
-    }
+    size_t bytes = direct.bytes;
+
+    snprintf(id, sizeof(id), "%s", direct.id);
+    snprintf(results_path, sizeof(results_path), "%s", direct.results_path);
+    snprintf(meta_path, sizeof(meta_path), "%s", direct.meta_path);
+    snprintf(command, sizeof(command), "%s", direct.replay_command);
+
+    LOOGAL_INFO("session",
+                "create_direct",
+                a.query,
+                "created session through direct C services");
+
     append_index_line(id, &a, meta_path, results_path);
 
     char logmsg[LOOGAL_PATH_MAX * 2];
@@ -578,6 +572,31 @@ static int read_meta_value(const char *meta_path, const char *key, char *out, si
     return j > 0 ? 0 : -1;
 }
 
+static int run_search_direct_to_stdout(const SessionArgs *a) {
+    if (!a || !a->query) return -1;
+
+    char *search_argv[16];
+    int search_argc = 0;
+
+    search_argv[search_argc++] = (char *)a->query;
+
+    if (a->memory) {
+        search_argv[search_argc++] = "--memory";
+    } else if (a->place && a->place[0]) {
+        search_argv[search_argc++] = (char *)a->place;
+    }
+
+    search_argv[search_argc++] = "--json";
+    search_argv[search_argc++] = "--min";
+    search_argv[search_argc++] = (char *)(a->min_percent ? a->min_percent : "60");
+    search_argv[search_argc++] = "--limit";
+    search_argv[search_argc++] = (char *)(a->limit ? a->limit : "50");
+    search_argv[search_argc++] = "--offset";
+    search_argv[search_argc++] = (char *)(a->offset ? a->offset : "0");
+
+    return cmd_search(search_argc, search_argv);
+}
+
 static int cmd_session_page(int argc, char **argv) {
     if (argc < 1) {
         session_usage();
@@ -607,20 +626,37 @@ static int cmd_session_page(int argc, char **argv) {
     memset(&a, 0, sizeof(a));
     a.query = query;
     a.place = place;
+    a.memory = (place[0] == '\0');
     a.min_percent = minp;
     a.limit = limit;
     a.offset = offset;
 
-    char command[SESSION_CMD_MAX];
-    if (build_search_command(&a, command, sizeof(command)) != 0) return 1;
-    FILE *pipe = popen(command, "r");
-    if (!pipe) return 1;
-    char buf[8192];
-    size_t n;
-    while ((n = fread(buf, 1, sizeof(buf), pipe)) > 0) fwrite(buf, 1, n, stdout);
-    int rc = pclose(pipe);
-    loogal_log("session", rc == 0 ? "ok" : "error", "paged session by replaying stored query");
-    return rc == 0 ? 0 : 1;
+    /*
+     * Direct-C paging path.
+     *
+     * Old behavior spawned:
+     *   ./loogal search ...
+     *
+     * New behavior calls the search command directly in-process while
+     * preserving stdout output for the caller. This removes shell quoting,
+     * subprocess overhead, and self-recursive CLI orchestration.
+     */
+    int rc = run_search_direct_to_stdout(&a);
+
+    if (rc == 0) {
+        LOOGAL_INFO("session", "page_direct", id, "paged session through direct C search");
+        loogal_log("session", "ok", "paged session through direct C search");
+        return 0;
+    }
+
+    LOOGAL_ERROR(LOOGAL_ERR_CMD_OPERATION_FAILED,
+                 "session",
+                 "page_direct",
+                 id,
+                 "direct session page search failed");
+
+    loogal_log("session", "error", "direct session page search failed");
+    return 1;
 }
 
 int cmd_session(int argc, char **argv) {
