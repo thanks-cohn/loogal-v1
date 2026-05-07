@@ -307,16 +307,31 @@ int loogal_memory_mark_known_location_if_unchanged(LoogalMemory *m, const char *
     if (!m || !path || !path[0]) return 0;
 
     LoogalLocation *loc = find_location_by_path(m, path);
-    if (!loc) return 0;
-    if (loc->status != LOOGAL_LOCATION_ACTIVE) return 0;
-    if (loc->file_size != file_size) return 0;
+    if (!loc) {
+        loogal_log("location.fast_skip", "miss", "path not found in memory");
+        return 0;
+    }
+    if (loc->status != LOOGAL_LOCATION_ACTIVE) {
+        loogal_log("location.fast_skip", "miss", "known path is not active");
+        return 0;
+    }
+    if (loc->file_size != file_size) {
+        loogal_log("location.fast_skip", "miss", "file size mismatch");
+        return 0;
+    }
 
     /*
      * Old location rows may not have mtime_unix yet. Refuse to fast-skip
      * those until one full ingest refresh has populated durable metadata.
      */
-    if (loc->mtime_unix == 0 || mtime_unix == 0) return 0;
-    if (loc->mtime_unix != mtime_unix) return 0;
+    if (loc->mtime_unix == 0 || mtime_unix == 0) {
+        loogal_log("location.fast_skip", "miss", "mtime missing or zero");
+        return 0;
+    }
+    if (loc->mtime_unix != mtime_unix) {
+        loogal_log("location.fast_skip", "miss", "mtime mismatch");
+        return 0;
+    }
 
     if (touch) {
         uint64_t ts = (uint64_t)now_unix();

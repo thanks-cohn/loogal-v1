@@ -8,6 +8,7 @@
 #include <string.h>
 #include <strings.h>
 #include <stdint.h>
+#include <sys/stat.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
@@ -215,6 +216,12 @@ int image_probe(const char *path, LoogalImageInfo *out) {
     snprintf(out->ext, sizeof(out->ext), "%s", file_extension(path));
 
     out->file_size = file_size_bytes(path);
+
+struct stat st;
+if (stat(path, &st) == 0) {
+out->file_size = (uint64_t)st.st_size;
+out->mtime_unix = (uint64_t)st.st_mtime;
+}
 
     int width = 0;
     int height = 0;
