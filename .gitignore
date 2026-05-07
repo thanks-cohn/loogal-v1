@@ -74,3 +74,8 @@ data/sessions/
 
 # generated release binaries
 releases/*.exe
+
+# keep public API headers tracked
+!include/
+!include/loogal/
+!include/loogal/*.h
