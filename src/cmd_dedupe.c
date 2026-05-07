@@ -1,10 +1,9 @@
 #define _XOPEN_SOURCE 700
 #include "loogal.h"
+#include "loogal/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/stat.h>
 #include <libgen.h>
 #include "pathsafe.h"
 #include "receipt.h"
@@ -21,8 +20,8 @@ static int better(const LoogalRecord *a, const LoogalRecord *b) {
 
 static void mkdir_p_simple(const char *dir) {
     char tmp[LOOGAL_PATH_MAX]; snprintf(tmp, sizeof(tmp), "%s", dir);
-    for (char *p = tmp + 1; *p; p++) if (*p == '/') { *p = 0; mkdir(tmp, 0755); *p = '/'; }
-    mkdir(tmp, 0755);
+    for (char *p = tmp + 1; *p; p++) if (*p == '/') { *p = 0; loogal_platform_mkdir(tmp); *p = '/'; }
+    loogal_platform_mkdir(tmp);
 }
 
 static int basename_copy(const char *path, char *out, size_t n) {
@@ -41,7 +40,7 @@ if (basename_copy(move->path, base, sizeof(base)) != 0) {
 }
     char dest[LOOGAL_PATH_MAX]; snprintf(dest, sizeof(dest), "%s/%s", dest_dir, base);
     int suffix = 1;
-    while (access(dest, F_OK) == 0) {
+    while (loogal_platform_path_exists(dest)) {
         snprintf(dest, sizeof(dest), "%s/%d-%s", dest_dir, suffix++, base);
     }
     if (rename(move->path, dest) != 0) return -1;

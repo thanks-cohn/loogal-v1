@@ -38,6 +38,14 @@ int main(void) {
         return fail("file_exists failed");
     }
 
+    if (!loogal_platform_path_exists(src)) {
+        return fail("path_exists file failed");
+    }
+
+    if (!loogal_platform_path_exists(dir)) {
+        return fail("path_exists dir failed");
+    }
+
     if (!loogal_platform_file_readable(src)) {
         return fail("file_readable failed");
     }
