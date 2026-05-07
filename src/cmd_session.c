@@ -5,7 +5,6 @@
 #include "session.h"
 
 #include <ctype.h>
-#include <dirent.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -322,52 +321,97 @@ static int cmd_session_show(int argc, char **argv) {
     return 0;
 }
 
+typedef struct {
+int as_json;
+int first;
+} LoogalSessionListCtx;
+
+static const char *session_entry_id_from_path(const char *path) {
+if (!path) return "";
+
+const char *slash = strrchr(path, '/');
+
+return slash ? slash + 1 : path;
+}
+
+static int session_list_cb(const LoogalPlatformWalkEntry *entry, void *user) {
+if (!entry || !user) return -1;
+
+LoogalSessionListCtx *ctx = (LoogalSessionListCtx *)user;
+
+if (entry->depth != 1) return 0;
+if (entry->type != LOOGAL_PLATFORM_ENTRY_DIR) return 0;
+
+const char *id = session_entry_id_from_path(entry->path);
+
+if (strncmp(id, "session_", 8) != 0) return 0;
+
+if (ctx->as_json) {
+if (!ctx->first) puts(",");
+printf("    {");
+printf("\"id\":");
+loogal_json_string(stdout, id);
+printf(",\"meta\":");
+
+char meta[LOOGAL_PATH_MAX * 2];
+int meta_n = snprintf(meta, sizeof(meta), "%s/%s/meta.json", LOOGAL_SESSION_DIR, id);
+if (meta_n < 0 || meta_n >= (int)sizeof(meta)) return -1;
+loogal_json_string(stdout, meta);
+
+printf(",\"results\":");
+
+char res[LOOGAL_PATH_MAX * 2];
+int res_n = snprintf(res, sizeof(res), "%s/%s/results.json", LOOGAL_SESSION_DIR, id);
+if (res_n < 0 || res_n >= (int)sizeof(res)) return -1;
+loogal_json_string(stdout, res);
+
+printf("}");
+ctx->first = 0;
+} else {
+printf("  %s\n", id);
+}
+
+return 0;
+}
+
 static int cmd_session_list(int argc, char **argv) {
-    int as_json = loogal_has_flag(argc, argv, "--json");
-    DIR *d = opendir(LOOGAL_SESSION_DIR);
-    if (!d) {
-        if (as_json) puts("{\n  \"tool\": \"loogal\",\n  \"type\": \"session.list\",\n  \"sessions\": []\n}");
-        else puts("No sessions yet.");
-        return 0;
-    }
+int as_json = loogal_has_flag(argc, argv, "--json");
 
-    if (as_json) {
-        puts("{");
-        printf("  "); loogal_json_kv_string(stdout, "tool", "loogal", 1);
-        printf("  "); loogal_json_kv_string(stdout, "type", "session.list", 1);
-        puts("  \"sessions\": [");
-    } else {
-        puts("LOOGAL SESSIONS");
-    }
+if (!loogal_platform_dir_exists(LOOGAL_SESSION_DIR)) {
+if (as_json) puts("{\n  \"tool\": \"loogal\",\n  \"type\": \"session.list\",\n  \"sessions\": []\n}");
+else puts("No sessions yet.");
+return 0;
+}
 
-    int first = 1;
-    struct dirent *ent;
-    while ((ent = readdir(d)) != NULL) {
-        if (ent->d_name[0] == '.') continue;
-        if (strncmp(ent->d_name, "session_", 8) != 0) continue;
-        if (as_json) {
-            if (!first) puts(",");
-            printf("    {");
-            printf("\"id\":"); loogal_json_string(stdout, ent->d_name);
-            printf(",\"meta\":");
-            char meta[LOOGAL_PATH_MAX * 2];
-            snprintf(meta, sizeof(meta), "%s/%s/meta.json", LOOGAL_SESSION_DIR, ent->d_name);
-            loogal_json_string(stdout, meta);
-            printf(",\"results\":");
-            char res[LOOGAL_PATH_MAX * 2];
-            snprintf(res, sizeof(res), "%s/%s/results.json", LOOGAL_SESSION_DIR, ent->d_name);
-            loogal_json_string(stdout, res);
-            printf("}");
-            first = 0;
-        } else {
-            printf("  %s\n", ent->d_name);
-        }
-    }
-    closedir(d);
+if (as_json) {
+puts("{");
+printf("  "); loogal_json_kv_string(stdout, "tool", "loogal", 1);
+printf("  "); loogal_json_kv_string(stdout, "type", "session.list", 1);
+puts("  \"sessions\": [");
+} else {
+puts("LOOGAL SESSIONS");
+}
 
-    if (as_json) puts("\n  ]\n}");
-    loogal_log("session", "ok", "listed sessions");
-    return 0;
+LoogalSessionListCtx ctx;
+ctx.as_json = as_json;
+ctx.first = 1;
+
+if (loogal_platform_walk(LOOGAL_SESSION_DIR, session_list_cb, &ctx) != 0) {
+if (as_json) {
+puts("");
+puts("  ]");
+puts("}");
+}
+return 1;
+}
+
+if (as_json) {
+puts("");
+puts("  ]");
+puts("}");
+}
+
+return 0;
 }
 
 static int read_meta_value(const char *meta_path, const char *key, char *out, size_t out_sz) {
