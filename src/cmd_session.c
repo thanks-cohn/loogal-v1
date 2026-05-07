@@ -194,6 +194,137 @@ static int build_search_command(const SessionArgs *a, char *cmd, size_t cmd_sz) 
                     q_query, q_place, a->min_percent, a->limit, a->offset) >= (int)cmd_sz ? -1 : 0;
 }
 
+
+static int run_search_direct_to_file(const SessionArgs *a, const char *results_path, size_t *bytes_out) {
+    if (!a || !results_path) return -1;
+
+    FILE *out = fopen(results_path, "wb");
+    if (!out) return -1;
+
+    fflush(stdout);
+
+    int saved_stdout = dup(STDOUT_FILENO);
+    if (saved_stdout < 0) {
+        fclose(out);
+        return -1;
+    }
+
+    int out_fd = fileno(out);
+    if (out_fd < 0) {
+        close(saved_stdout);
+        fclose(out);
+        return -1;
+    }
+
+    if (dup2(out_fd, STDOUT_FILENO) < 0) {
+        close(saved_stdout);
+        fclose(out);
+        return -1;
+    }
+
+    char *search_argv[16];
+    int search_argc = 0;
+
+    search_argv[search_argc++] = (char *)a->query;
+
+    if (a->memory) {
+        search_argv[search_argc++] = "--memory";
+    } else if (a->place) {
+        search_argv[search_argc++] = (char *)a->place;
+    }
+
+    search_argv[search_argc++] = "--json";
+    search_argv[search_argc++] = "--min";
+    search_argv[search_argc++] = (char *)(a->min_percent ? a->min_percent : "60");
+    search_argv[search_argc++] = "--limit";
+    search_argv[search_argc++] = (char *)(a->limit ? a->limit : "50");
+    search_argv[search_argc++] = "--offset";
+    search_argv[search_argc++] = (char *)(a->offset ? a->offset : "0");
+
+    int rc = cmd_search(search_argc, search_argv);
+
+    fflush(stdout);
+
+    long pos = ftell(out);
+    if (pos < 0) pos = 0;
+
+    if (dup2(saved_stdout, STDOUT_FILENO) < 0) {
+        close(saved_stdout);
+        fclose(out);
+        return -1;
+    }
+
+    close(saved_stdout);
+
+    if (fclose(out) != 0) return -1;
+
+    if (bytes_out) *bytes_out = (size_t)pos;
+
+    return rc == 0 ? 0 : -1;
+}
+
+int loogal_session_create_direct(
+    const char *query,
+    const char *place,
+    int memory,
+    const char *min_percent,
+    const char *limit,
+    const char *offset,
+    LoogalSessionCreateResult *out
+) {
+    if (!query || !out) return -1;
+    if (!memory && !place) return -1;
+
+    memset(out, 0, sizeof(*out));
+
+    SessionArgs a;
+    memset(&a, 0, sizeof(a));
+    a.query = query;
+    a.place = place;
+    a.memory = memory;
+    a.min_percent = min_percent ? min_percent : "60";
+    a.limit = limit ? limit : "50";
+    a.offset = offset ? offset : "0";
+
+    if (build_search_command(&a, out->replay_command, sizeof(out->replay_command)) != 0) {
+        LOOGAL_ERROR(LOOGAL_ERR_INTERNAL_TRUNCATED, "session", "build_replay_command", query, "failed to build replay command");
+        return -1;
+    }
+
+    snprintf(out->id, sizeof(out->id), "session_%ld_%ld", (long)now_unix(), (long)getpid());
+
+    char dir[LOOGAL_PATH_MAX * 2];
+    int n_dir = snprintf(dir, sizeof(dir), "%s/%s", LOOGAL_SESSION_DIR, out->id);
+    int n_results = snprintf(out->results_path, sizeof(out->results_path), "%s/results.json", dir);
+    int n_meta = snprintf(out->meta_path, sizeof(out->meta_path), "%s/meta.json", dir);
+
+    if (n_dir < 0 || n_dir >= (int)sizeof(dir) ||
+        n_results < 0 || n_results >= (int)sizeof(out->results_path) ||
+        n_meta < 0 || n_meta >= (int)sizeof(out->meta_path)) {
+        LOOGAL_ERROR(LOOGAL_ERR_PLATFORM_PATH_TOO_LONG, "session", "create_paths", query, "session path exceeded fixed buffer");
+        return -1;
+    }
+
+    if (mkdir_p_simple(dir) != 0) {
+        LOOGAL_ERROR(LOOGAL_ERR_IO_MKDIR, "session", "mkdir_session_dir", dir, "failed to create session directory");
+        return -1;
+    }
+
+    if (run_search_direct_to_file(&a, out->results_path, &out->bytes) != 0) {
+        LOOGAL_ERROR(LOOGAL_ERR_CMD_OPERATION_FAILED, "session", "run_search_direct", query, "direct search failed while creating session");
+        return -1;
+    }
+
+    if (write_meta_file(out->meta_path, out->id, &a, out->results_path, out->replay_command) != 0) {
+        LOOGAL_ERROR(LOOGAL_ERR_IO_WRITE_OUTPUT, "session", "write_meta", out->meta_path, "failed to write session meta");
+        return -1;
+    }
+
+    append_index_line(out->id, &a, out->meta_path, out->results_path);
+
+    return 0;
+}
+
 static int cmd_session_create(int argc, char **argv) {
     SessionArgs a;
     if (parse_create_args(argc, argv, &a) != 0) {

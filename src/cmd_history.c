@@ -210,6 +210,54 @@ static void append_audit(const char *event, const HistoryEntry *e, int current_i
     fclose(f);
 }
 
+
+int loogal_history_push_direct(
+    const char *query,
+    const char *session,
+    long scroll_offset,
+    long selected_rank
+) {
+    if (!query || !session) return -1;
+
+    HistoryEntry entries[HISTORY_MAX_ENTRIES];
+    int count = load_entries(entries, HISTORY_MAX_ENTRIES);
+    int current = read_current_index();
+
+    if (current < -1) current = -1;
+    if (current >= count) current = count - 1;
+
+    int keep_count = current + 1;
+    if (keep_count < 0) keep_count = 0;
+    if (keep_count > count) keep_count = count;
+    count = keep_count;
+
+    if (count >= HISTORY_MAX_ENTRIES) {
+        LOOGAL_ERROR(LOOGAL_ERR_INTERNAL_OVERFLOW, "history", "push", query, "history stack is full");
+        return -1;
+    }
+
+    HistoryEntry e;
+    memset(&e, 0, sizeof(e));
+    e.index = count;
+    iso_time_now(e.ts, sizeof(e.ts));
+    safe_copy(e.query, sizeof(e.query), query);
+    safe_copy(e.session, sizeof(e.session), session);
+    e.scroll_offset = scroll_offset;
+    e.selected_rank = selected_rank;
+
+    entries[count++] = e;
+
+    if (write_entries(entries, count) != 0 || write_current_index(count - 1) != 0) {
+        LOOGAL_ERROR(LOOGAL_ERR_IO_WRITE_OUTPUT, "history", "write_push", query, "failed to write history stack/state");
+        return -1;
+    }
+
+    append_audit("push", &e, count - 1);
+    LOOGAL_INFO("history", "push_direct", query, "pushed history entry through direct C service");
+
+    return 0;
+}
+
 static int cmd_history_push(int argc, char **argv) {
     int as_json = has_flag_local(argc, argv, "--json");
     const char *query = arg_value(argc, argv, "--query");

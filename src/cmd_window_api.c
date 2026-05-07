@@ -2,6 +2,8 @@
 #include "loogal.h"
 #include "jsonout.h"
 #include "window_api.h"
+#include "session.h"
+#include "history.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -187,52 +189,128 @@ static int cmd_window_api_current(int argc, char **argv) {
 }
 
 static int cmd_window_api_similar(int argc, char **argv) {
-    const char *path = arg_value(argc, argv, "--path");
-    const char *place = arg_value(argc, argv, "--place");
-    const char *limit = arg_value(argc, argv, "--limit");
-    const char *minp = arg_value(argc, argv, "--min");
-    int memory = has_flag_local(argc, argv, "--memory");
-    int push_history = has_flag_local(argc, argv, "--push-history");
-    int as_json = has_flag_local(argc, argv, "--json");
-    int dry_run = has_flag_local(argc, argv, "--dry-run");
+const char *path = arg_value(argc, argv, "--path");
+const char *place = arg_value(argc, argv, "--place");
+const char *limit = arg_value(argc, argv, "--limit");
+const char *minp = arg_value(argc, argv, "--min");
+const char *offset = arg_value(argc, argv, "--offset");
 
-    if (!path) {
-        fprintf(stderr, "[loogal:window_api_error] missing --path\n");
-        return 1;
-    }
-    if (!place && !memory) {
-        fprintf(stderr, "[loogal:window_api_error] provide --place <dir> or --memory\n");
-        return 1;
-    }
-    if (!limit) limit = "50";
-    if (!minp) minp = "60";
+int memory = has_flag_local(argc, argv, "--memory");
+int push_history = has_flag_local(argc, argv, "--push-history");
+int as_json = has_flag_local(argc, argv, "--json");
+int dry_run = has_flag_local(argc, argv, "--dry-run");
 
-    char q_path[4096];
-    char q_place[4096];
-    if (shell_quote(path, q_path, sizeof(q_path)) != 0) {
-        fprintf(stderr, "[loogal:window_api_error] path too long\n");
-        return 1;
-    }
-    if (place && shell_quote(place, q_place, sizeof(q_place)) != 0) {
-        fprintf(stderr, "[loogal:window_api_error] place too long\n");
+if (!path) {
+    fprintf(stderr, "[loogal:window_api_error] missing --path\n");
+    LOOGAL_ERROR(LOOGAL_ERR_CMD_MISSING_ARGUMENT,
+                 "window_api",
+                 "similar",
+                 NULL,
+                 "missing --path");
+    return 1;
+}
+
+if (!place && !memory) {
+    fprintf(stderr, "[loogal:window_api_error] provide --place <dir> or --memory\n");
+    LOOGAL_ERROR(LOOGAL_ERR_CMD_MISSING_ARGUMENT,
+                 "window_api",
+                 "similar",
+                 path,
+                 "missing search scope");
+    return 1;
+}
+
+if (!limit) limit = "50";
+if (!minp) minp = "60";
+if (!offset) offset = "0";
+
+if (dry_run) {
+    puts("{");
+    print_json_string_field("tool", "loogal", 1);
+    print_json_string_field("type", "window_api.similar.dry_run", 1);
+    print_json_string_field("path", path, 1);
+    print_json_string_field("scope", memory ? "memory" : place, 1);
+    print_json_string_field("execution", "direct.c", 0);
+    puts("}");
+    return 0;
+}
+
+LoogalSessionCreateResult session;
+
+if (loogal_session_create_direct(
+        path,
+        place,
+        memory,
+        minp,
+        limit,
+        offset,
+        &session
+    ) != 0) {
+
+    fprintf(stderr, "[loogal:window_api_error] session creation failed\n");
+
+    LOOGAL_ERROR(LOOGAL_ERR_CMD_OPERATION_FAILED,
+                 "window_api",
+                 "similar_create",
+                 path,
+                 "direct session create failed");
+
+    return 1;
+}
+
+int history_pushed = 0;
+
+if (push_history) {
+    long off = strtol(offset, NULL, 10);
+
+    if (loogal_history_push_direct(path, session.id, off, 1) != 0) {
+
+        fprintf(stderr, "[loogal:window_api_error] history push failed\n");
+
+        LOOGAL_ERROR(LOOGAL_ERR_CMD_OPERATION_FAILED,
+                     "window_api",
+                     "history_push",
+                     path,
+                     "direct history push failed");
+
         return 1;
     }
 
-    char cmd[WINDOW_API_CMD_MAX];
-    int n;
-    if (memory) {
-        n = snprintf(cmd, sizeof(cmd), "./loogal similar --path %s --memory --min %s --limit %s%s --json",
-                     q_path, minp, limit, push_history ? " --push-history" : "");
-    } else {
-        n = snprintf(cmd, sizeof(cmd), "./loogal similar --path %s --place %s --min %s --limit %s%s --json",
-                     q_path, q_place, minp, limit, push_history ? " --push-history" : "");
-    }
-    if (n < 0 || n >= (int)sizeof(cmd)) {
-        fprintf(stderr, "[loogal:window_api_error] command too long\n");
-        return 1;
-    }
+    history_pushed = 1;
+}
 
-    return run_passthrough_json("similar", cmd, as_json, dry_run);
+LOOGAL_INFO("window_api",
+            "similar_created",
+            path,
+            "window-api similar created through direct services");
+
+if (as_json) {
+    puts("{");
+    print_json_string_field("tool", "loogal", 1);
+    print_json_string_field("type", "window_api.similar.created", 1);
+    print_json_string_field("path", path, 1);
+    print_json_string_field("scope", memory ? "memory" : place, 1);
+    print_json_string_field("session_id", session.id, 1);
+    print_json_string_field("meta", session.meta_path, 1);
+    print_json_string_field("results", session.results_path, 1);
+
+    printf("\"bytes\": %zu,\n", session.bytes);
+    printf("\"history_pushed\": %s,\n",
+           history_pushed ? "true" : "false");
+
+    print_json_string_field("execution", "direct.c", 1);
+    print_json_string_field("replay_command",
+                            session.replay_command,
+                            0);
+
+    puts("}");
+} else {
+    printf("[loogal:window_api_ok] session=%s path=%s\n",
+           session.id,
+           path);
+}
+
+return 0;
 }
 
 int cmd_window_api(int argc, char **argv) {
