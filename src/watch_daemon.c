@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700
 
 #include "loogal/watch_daemon.h"
+#include "loogal/watch_mutation.h"
 #include "loogal.h"
 
 #include <stdio.h>
@@ -29,17 +30,17 @@ int loogal_watch_daemon_handle_event(const LoogalWatchEvent *event) {
 
     switch (event->type) {
     case LOOGAL_WATCH_EVENT_CREATED:
-        loogal_log("watch_daemon.created", "ok", event->path);
-        return 0;
+        return loogal_watch_handle_created(event->path);
+
     case LOOGAL_WATCH_EVENT_MODIFIED:
-        loogal_log("watch_daemon.modified", "ok", event->path);
-        return 0;
+        return loogal_watch_handle_modified(event->path);
+
     case LOOGAL_WATCH_EVENT_DELETED:
-        loogal_log("watch_daemon.deleted", "ok", event->path);
-        return 0;
+        return loogal_watch_handle_deleted(event->path);
+
     case LOOGAL_WATCH_EVENT_MOVED:
-        loogal_log("watch_daemon.moved", "ok", event->path);
-        return 0;
+        return loogal_watch_handle_moved(event->old_path, event->path);
+
     default:
         loogal_log("watch_daemon.event", "error", "unknown event type");
         return 1;
