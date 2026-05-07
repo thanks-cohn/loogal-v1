@@ -173,12 +173,17 @@ int loogal_cmd_watch_add(int argc, char **argv) {
 return 1;
 }
 
-    if (argc < 3) {
+    if (argc < 3 || strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0 || strcmp(argv[2], "--help") == 0 || strcmp(argv[2], "-h") == 0) {
         fprintf(stderr, "Usage:\n");
         fprintf(stderr, "  loogal watch-add <path> --daily 00:00\n");
         fprintf(stderr, "  loogal watch-add <path> --hourly\n");
         fprintf(stderr, "  loogal watch-add <path> --weekly sun 03:00\n");
         fprintf(stderr, "  loogal watch-add <path> --yearly 05-23 00:00\n");
+        return 1;
+    }
+
+    if (argv[2][0] == '-') {
+        fprintf(stderr, "[loogal-watch:error] watch-add requires a real path before schedule flags\n");
         return 1;
     }
 
