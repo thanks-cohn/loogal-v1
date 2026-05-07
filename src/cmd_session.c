@@ -569,7 +569,7 @@ static int read_meta_value(const char *meta_path, const char *key, char *out, si
     }
     out[j] = 0;
     free(buf);
-    return j > 0 ? 0 : -1;
+    return 0;
 }
 
 static int run_search_direct_to_stdout(const SessionArgs *a) {
