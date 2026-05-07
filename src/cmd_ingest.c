@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700
 
 #include "loogal.h"
+#include "loogal/platform.h"
 #include "jsonout.h"
 #include "ingest.h"
 #include "timer.h"
@@ -295,13 +296,11 @@ loogal_log("ingest", "error", "missing --dry-run");
 return 1;
 }
 
-struct stat st;
-
-if (stat(plan.root, &st) != 0) {
+if (!loogal_platform_dir_exists(plan.root)) {
 puts("LOOGAL INGEST");
 puts("────────────────────────");
-printf("[ERR] root not found: %s\n", plan.root);
-loogal_log("ingest", "error", "root not found");
+printf("[ERR] root is not a readable directory: %s\n", plan.root);
+loogal_log("ingest", "error", "root is not a readable directory");
 return 1;
 }
 
