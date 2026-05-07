@@ -1,8 +1,10 @@
 #define _XOPEN_SOURCE 700
 #include "audit.h"
 #include "loogal.h"
+#include "loogal/log.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 static void audit_ts(char *buf, size_t n) {
@@ -43,4 +45,30 @@ void loogal_audit_event(const char *event, const char *status, const char *messa
 
 void loogal_log(const char *event, const char *status, const char *message) {
     loogal_audit_event(event, status, message);
+
+    LoogalLogLevel level = LOOGAL_LOG_INFO;
+    LoogalError code = LOOGAL_OK;
+
+    if (status && status[0]) {
+        if (strcmp(status, "error") == 0) {
+            level = LOOGAL_LOG_ERROR;
+            code = LOOGAL_ERR_CMD_OPERATION_FAILED;
+        } else if (strcmp(status, "warn") == 0 || strcmp(status, "warning") == 0) {
+            level = LOOGAL_LOG_WARN;
+            code = LOOGAL_ERR_CMD_OPERATION_FAILED;
+        }
+    }
+
+    loogal_log_event_ex(
+        level,
+        code,
+        event ? event : "legacy",
+        status ? status : "legacy",
+        NULL,
+        message ? message : "",
+        NULL,
+        __FILE__,
+        __LINE__,
+        __func__
+    );
 }

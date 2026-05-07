@@ -152,3 +152,67 @@ test-platform-core:
 	bash tests/test_platform_core.sh
 
 .PHONY: test-platform-core
+
+# ---------------------------------------------------------------------
+# Dependency and purity audits
+# ---------------------------------------------------------------------
+
+ENGINE_FILES = \
+	src/core/delta.c \
+	src/core/sha256.c \
+	src/core/shadow.c \
+	src/error.c \
+	src/hash.c \
+	src/image.c \
+	src/index.c \
+	src/jsonout.c \
+	src/log.c \
+	src/manifest.c \
+	src/memory.c \
+	src/pathsafe.c \
+	src/rebuild.c \
+	src/receipt.c \
+	src/timer.c \
+	src/verify.c \
+	src/why.c \
+	include/*.h \
+	include/loogal/*.h
+
+audit-deps:
+	@echo "[audit] shell/process calls"
+	@grep -R -nE '\b(popen|system|fork|exec|posix_spawn)\b|"\./loogal([[:space:]]|")' src include Makefile --exclude='*.o' || true
+	@echo
+	@echo "[audit] desktop/gui/platform adapters"
+	@grep -R -nE 'gtk|pkg-config|xdg-open|dolphin|wl-copy|xclip|xsel' src include Makefile --exclude='*.o' || true
+	@echo
+	@echo "[audit] forbidden external image/runtime tools"
+	@grep -R -nE 'ImageMagick|magick|convert|identify|sha256sum|python' src include Makefile --exclude='*.o' || true
+	@echo
+	@echo "[audit] dangerous C calls"
+	@grep -R -nE '\b(strcpy|strcat|sprintf|gets|scanf|sscanf)\b' src include --exclude='*.o' || true
+
+audit-engine-no-shell:
+	@echo "[audit] engine must not shell out"
+	@! grep -nE '\b(popen|system|fork|exec|posix_spawn)\b|"\./loogal([[:space:]]|")' $(ENGINE_FILES)
+
+audit-engine-no-desktop:
+	@echo "[audit] engine must not know desktop/gui tools"
+	@! grep -nE 'gtk|pkg-config|xdg-open|dolphin|wl-copy|xclip|xsel' $(ENGINE_FILES)
+
+audit-engine-no-external-image-tools:
+	@echo "[audit] engine must not depend on external image/runtime tools"
+	@! grep -nE 'ImageMagick|magick|convert|identify|sha256sum|python' $(ENGINE_FILES)
+
+audit-engine-c-danger:
+	@echo "[audit] engine must avoid dangerous C calls"
+	@! grep -nE '\b(strcpy|strcat|sprintf|gets|scanf|sscanf)\b' $(ENGINE_FILES)
+
+audit-engine-pure: audit-engine-no-shell audit-engine-no-desktop audit-engine-no-external-image-tools audit-engine-c-danger
+	@echo "[ok] engine purity wall holds"
+
+audit-built-artifacts:
+	@echo "[audit] generated artifacts accidentally tracked"
+	@git ls-files | grep -E '(^loogal$$|^loogal-window$$|^loogal-gallery-window$$|\.o$$|^releases/.*\.exe$$)' || true
+
+.PHONY: audit-deps audit-engine-no-shell audit-engine-no-desktop audit-engine-no-external-image-tools audit-engine-c-danger audit-engine-pure audit-built-artifacts
+

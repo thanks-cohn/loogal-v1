@@ -53,3 +53,24 @@ __pycache__/
 # Python cache files from test helpers
 __pycache__/
 *.pyc
+# loogal build artifacts
+loogal
+loogal-window
+loogal-gallery-window
+src/*.o
+src/core/*.o
+*.o
+
+# runtime state
+data/loogal.bin
+data/records.jsonl
+data/identities.jsonl
+data/locations.jsonl
+data/events.jsonl
+data/*.tmp
+data/logs/
+data/manifests/
+data/sessions/
+
+# generated release binaries
+releases/*.exe

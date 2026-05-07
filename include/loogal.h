@@ -5,6 +5,9 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include "loogal/error.h"
+#include "loogal/log.h"
+
 #define LOOGAL_VERSION "0.1.0"
 #define LOOGAL_MAGIC "LOOGALV1"
 #define LOOGAL_PATH_MAX 1024
