@@ -2,9 +2,11 @@
 
 #include "loogal/platform.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -165,6 +167,100 @@ int loogal_platform_copy_file(const char *src, const char *dst) {
 
     return 0;
 }
+
+
+static int loogal_platform_join_path(char *out, size_t out_sz, const char *a, const char *b) {
+    if (!out || !a || !b || out_sz == 0) return -1;
+
+    size_t an = strlen(a);
+    const char *sep = (an > 0 && a[an - 1] == '/') ? "" : "/";
+
+    int n = snprintf(out, out_sz, "%s%s%s", a, sep, b);
+
+    if (n < 0 || (size_t)n >= out_sz) return -1;
+
+    return 0;
+}
+
+static LoogalPlatformEntryType loogal_platform_entry_type_from_mode(mode_t mode) {
+    if (S_ISREG(mode)) return LOOGAL_PLATFORM_ENTRY_FILE;
+    if (S_ISDIR(mode)) return LOOGAL_PLATFORM_ENTRY_DIR;
+    if (S_ISLNK(mode)) return LOOGAL_PLATFORM_ENTRY_SYMLINK;
+    return LOOGAL_PLATFORM_ENTRY_OTHER;
+}
+
+static int loogal_platform_walk_inner(const char *root, uint64_t depth, LoogalPlatformWalkFn fn, void *user) {
+    DIR *dir = opendir(root);
+
+    if (!dir) {
+        return -1;
+    }
+
+    for (;;) {
+        errno = 0;
+        struct dirent *ent = readdir(dir);
+
+        if (!ent) {
+            int saved_errno = errno;
+            closedir(dir);
+            return saved_errno == 0 ? 0 : -1;
+        }
+
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) {
+            continue;
+        }
+
+        char child[4096];
+
+        if (loogal_platform_join_path(child, sizeof(child), root, ent->d_name) != 0) {
+            continue;
+        }
+
+        struct stat st;
+
+        if (lstat(child, &st) != 0) {
+            continue;
+        }
+
+        LoogalPlatformWalkEntry entry;
+        memset(&entry, 0, sizeof(entry));
+
+        snprintf(entry.path, sizeof(entry.path), "%s", child);
+        entry.type = loogal_platform_entry_type_from_mode(st.st_mode);
+        entry.depth = depth;
+
+        if (S_ISREG(st.st_mode) && st.st_size > 0) {
+            entry.size = (uint64_t)st.st_size;
+        }
+
+        int rc = fn(&entry, user);
+
+        if (rc != 0) {
+            closedir(dir);
+            return rc;
+        }
+
+        if (entry.type == LOOGAL_PLATFORM_ENTRY_DIR) {
+            rc = loogal_platform_walk_inner(child, depth + 1, fn, user);
+
+            if (rc != 0) {
+                closedir(dir);
+                return rc;
+            }
+        }
+    }
+}
+
+int loogal_platform_walk(const char *root, LoogalPlatformWalkFn fn, void *user) {
+    if (!root || !root[0] || !fn) return -1;
+
+    if (!loogal_platform_dir_exists(root)) {
+        return -1;
+    }
+
+    return loogal_platform_walk_inner(root, 1, fn, user);
+}
+
 
 uint64_t loogal_platform_now_ns(void) {
 #if defined(CLOCK_MONOTONIC)

@@ -10,6 +10,27 @@ cat > /tmp/loogal_platform_test.c <<'C_EOF'
 #include <stdint.h>
 #include <stdio.h>
 
+
+static int walk_seen_file = 0;
+static int walk_seen_dir = 0;
+
+static int walk_cb(const LoogalPlatformWalkEntry *entry, void *user) {
+(void)user;
+
+if (!entry) return 1;
+
+if (entry->type == LOOGAL_PLATFORM_ENTRY_FILE && entry->size == 6) {
+walk_seen_file = 1;
+}
+
+if (entry->type == LOOGAL_PLATFORM_ENTRY_DIR) {
+walk_seen_dir = 1;
+}
+
+return 0;
+}
+
+
 static int fail(const char *msg) {
     fprintf(stderr, "FAIL: %s\n", msg);
     return 1;
@@ -19,6 +40,9 @@ int main(void) {
     const char *dir = "/tmp/loogal-platform-test";
     const char *src = "/tmp/loogal-platform-test/source.txt";
     const char *dst = "/tmp/loogal-platform-test/copy.txt";
+
+const char *subdir = "/tmp/loogal-platform-test/subdir";
+const char *nested = "/tmp/loogal-platform-test/subdir/nested.txt";
 
     if (loogal_platform_mkdir(dir) != 0) {
         return fail("mkdir failed");
@@ -77,6 +101,28 @@ int main(void) {
         fprintf(stderr, "copied_size=%llu\n", (unsigned long long)copied_size);
         return fail("copied size mismatch");
     }
+
+if (loogal_platform_mkdir(subdir) != 0) {
+return fail("walk subdir mkdir failed");
+}
+
+FILE *nf = fopen(nested, "wb");
+if (!nf) return fail("could not create nested file");
+
+fwrite("loogal", 1, 6, nf);
+fclose(nf);
+
+if (loogal_platform_walk(dir, walk_cb, NULL) != 0) {
+return fail("platform_walk failed");
+}
+
+if (!walk_seen_file) {
+return fail("platform_walk did not see file");
+}
+
+if (!walk_seen_dir) {
+return fail("platform_walk did not see dir");
+}
 
     uint64_t now = loogal_platform_now_ns();
     if (now == 0) {
