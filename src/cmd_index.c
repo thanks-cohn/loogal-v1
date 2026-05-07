@@ -127,6 +127,11 @@ static int visitor(const char *fpath, const struct stat *sb, int typeflag, struc
 
     LoogalImageInfo info;
     if ((g_ctx->hash_mode_v0 ? image_probe_v0(fpath, &info) : image_probe(fpath, &info)) == 0) {
+if (sb) {
+info.file_size = (uint64_t)sb->st_size;
+info.mtime_unix = (uint64_t)sb->st_mtime;
+}
+
         if (!g_ctx->dry_run) {
             loogal_memory_ingest_image(&g_ctx->memory, &info);
         }
