@@ -27,13 +27,14 @@ typedef struct {
 } LoogalIdentity;
 
 typedef struct {
-    uint64_t id;
-    uint64_t identity_id;
-    char path[LOOGAL_PATH_MAX];
-    char kind[32];
-    uint64_t file_size;
-    uint64_t seen_unix;
-    uint32_t status;
+uint64_t id;
+uint64_t identity_id;
+char path[LOOGAL_PATH_MAX];
+char kind[32];
+uint64_t file_size;
+uint64_t mtime_unix;
+uint64_t seen_unix;
+uint32_t status;
 } LoogalLocation;
 
 typedef struct {
@@ -58,6 +59,7 @@ int loogal_memory_load(LoogalMemory *m);
 int loogal_memory_save(const LoogalMemory *m);
 int loogal_memory_reset_files(void);
 int loogal_memory_ingest_image(LoogalMemory *m, const LoogalImageInfo *info);
+int loogal_memory_mark_known_location_if_unchanged(LoogalMemory *m, const char *path, uint64_t file_size, uint64_t mtime_unix, int touch);
 int loogal_memory_build_records(const LoogalMemory *m, LoogalRecord **out_records, size_t *out_count);
 int loogal_memory_append_event(const char *type, const char *status, const char *path, uint64_t identity_id, const char *message);
 

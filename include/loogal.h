@@ -38,15 +38,16 @@ typedef struct {
 #pragma pack(pop)
 
 typedef struct {
-    char path[LOOGAL_PATH_MAX];
-    int width;
-    int height;
-    uint64_t file_size;
-    uint64_t dhash;
-    uint64_t ahash;
-    char sha256[65];
-    float aspect;
-    char ext[16];
+char path[LOOGAL_PATH_MAX];
+int width;
+int height;
+uint64_t file_size;
+uint64_t mtime_unix;
+uint64_t dhash;
+uint64_t ahash;
+char sha256[65];
+float aspect;
+char ext[16];
 } LoogalImageInfo;
 
 void loogal_log(const char *event, const char *status, const char *message);
