@@ -1,9 +1,8 @@
+#include "loogal/platform.h"
 #include <stdio.h>
-#include <sys/stat.h>
 
 static int exists(const char *path) {
-    struct stat st;
-    return stat(path, &st) == 0;
+return loogal_platform_file_exists(path);
 }
 
 int loogal_doctor(void) {
