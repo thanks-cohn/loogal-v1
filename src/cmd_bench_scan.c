@@ -4,12 +4,9 @@
 #include "loogal/platform.h"
 
 #include <ctype.h>
-#include <dirent.h>
-#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/stat.h>
 
 typedef struct {
     uint64_t directories_seen;
@@ -107,110 +104,89 @@ static void bench_count_size(BenchScanStats *st, uint64_t size) {
     }
 }
 
-static int bench_join_path(char *out, size_t out_sz, const char *a, const char *b) {
-    if (!out || !a || !b || out_sz == 0) return -1;
+typedef struct {
+BenchScanStats *st;
+} BenchWalkCtx;
 
-    size_t an = strlen(a);
-    const char *sep = (an > 0 && a[an - 1] == '/') ? "" : "/";
+static int bench_walk_cb(const LoogalPlatformWalkEntry *entry, void *user) {
+if (!entry || !user) return -1;
 
-    int n = snprintf(out, out_sz, "%s%s%s", a, sep, b);
+BenchWalkCtx *ctx = (BenchWalkCtx *)user;
+BenchScanStats *st = ctx->st;
 
-    if (n < 0 || (size_t)n >= out_sz) return -1;
+if (!st) return -1;
 
-    return 0;
+if (entry->depth > st->max_depth) {
+st->max_depth = entry->depth;
+}
+
+if (entry->type == LOOGAL_PLATFORM_ENTRY_SYMLINK) {
+st->symlinks_skipped++;
+return 0;
+}
+
+if (entry->type == LOOGAL_PLATFORM_ENTRY_DIR) {
+st->directories_seen++;
+return 0;
+}
+
+if (entry->type != LOOGAL_PLATFORM_ENTRY_FILE) {
+st->unsupported_files++;
+return 0;
+}
+
+st->files_seen++;
+
+bench_count_size(st, entry->size);
+
+uint64_t t0 = bench_now_ns();
+int supported = image_is_supported(entry->path);
+bench_count_ext(st, entry->path);
+uint64_t t1 = bench_now_ns();
+
+if (t1 >= t0) st->classify_ns += t1 - t0;
+
+if (supported) {
+st->supported_images++;
+} else {
+st->unsupported_files++;
+}
+
+return 0;
 }
 
 static int bench_walk_dir(const char *root, BenchScanStats *st, uint64_t depth) {
-    DIR *dir = opendir(root);
+(void)depth;
 
-    if (!dir) {
-        st->unreadable_entries++;
-        return -1;
-    }
+if (!root || !st) return -1;
 
-    if (depth > st->max_depth) {
-        st->max_depth = depth;
-    }
+/*
+The root directory itself is counted here. Children are counted by
+loogal_platform_walk(), which reports entries below the root.
+*/
+st->directories_seen++;
 
-    st->directories_seen++;
-
-    for (;;) {
-        errno = 0;
-        struct dirent *ent = readdir(dir);
-
-        if (!ent) {
-            if (errno != 0) {
-                st->unreadable_entries++;
-            }
-
-            break;
-        }
-
-        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) {
-            continue;
-        }
-
-        char child[LOOGAL_PATH_MAX];
-
-        if (bench_join_path(child, sizeof(child), root, ent->d_name) != 0) {
-            st->unreadable_entries++;
-            continue;
-        }
-
-        struct stat sb;
-
-        uint64_t t0 = bench_now_ns();
-        int rc = lstat(child, &sb);
-        uint64_t t1 = bench_now_ns();
-
-        if (t1 >= t0) st->stat_ns += t1 - t0;
-
-        if (rc != 0) {
-            st->unreadable_entries++;
-            continue;
-        }
-
-        if (S_ISLNK(sb.st_mode)) {
-            st->symlinks_skipped++;
-            continue;
-        }
-
-        if (S_ISDIR(sb.st_mode)) {
-            bench_walk_dir(child, st, depth + 1);
-            continue;
-        }
-
-        if (!S_ISREG(sb.st_mode)) {
-            st->unsupported_files++;
-            continue;
-        }
-
-        st->files_seen++;
-
-        uint64_t size = 0;
-        if (sb.st_size > 0) {
-            size = (uint64_t)sb.st_size;
-        }
-
-        bench_count_size(st, size);
-
-        t0 = bench_now_ns();
-        int supported = image_is_supported(child);
-        bench_count_ext(st, child);
-        t1 = bench_now_ns();
-
-        if (t1 >= t0) st->classify_ns += t1 - t0;
-
-        if (supported) {
-            st->supported_images++;
-        } else {
-            st->unsupported_files++;
-        }
-    }
-
-    closedir(dir);
-    return 0;
+if (st->max_depth < depth) {
+st->max_depth = depth;
 }
+
+BenchWalkCtx ctx;
+ctx.st = st;
+
+uint64_t t0 = bench_now_ns();
+int rc = loogal_platform_walk(root, bench_walk_cb, &ctx);
+uint64_t t1 = bench_now_ns();
+
+if (t1 >= t0) st->stat_ns += t1 - t0;
+
+if (rc != 0) {
+st->unreadable_entries++;
+return -1;
+}
+
+return 0;
+}
+
 
 static void bench_print_u64(const char *label, uint64_t value) {
     printf("  %-24s %llu\n", label, (unsigned long long)value);
