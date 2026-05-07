@@ -1,4 +1,5 @@
 #include "loogal.h"
+#include "hash_v0.h"
 #include "timer.h"
 #include "jsonout.h"
 #include "config.h"
@@ -145,6 +146,7 @@ return finish_command(cmd, rc, start_ms);
         return finish_command(cmd, rc, start_ms);
     }
 
+    if (strcmp(cmd, "hash-v0") == 0) return cmd_hash_v0(argc - 2, argv + 2);
     if (strcmp(cmd, "similar") == 0) {
         rc = cmd_similar(argc - 2, argv + 2);
         return finish_command(cmd, rc, start_ms);
