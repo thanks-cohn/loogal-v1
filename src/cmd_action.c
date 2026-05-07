@@ -1,5 +1,6 @@
 #define _XOPEN_SOURCE 700
 #include "loogal.h"
+#include "loogal/platform.h"
 #include "jsonout.h"
 #include "action.h"
 
@@ -11,7 +12,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -57,7 +57,7 @@ static int command_exists(const char *cmd) {
          dir = strtok_r(NULL, ":", &save)) {
         char candidate[LOOGAL_PATH_MAX];
         if (snprintf(candidate, sizeof(candidate), "%s/%s", dir, cmd) >= (int)sizeof(candidate)) continue;
-        if (access(candidate, X_OK) == 0) {
+        if (loogal_platform_executable_exists(candidate)) {
             found = 1;
             break;
         }
@@ -68,8 +68,7 @@ static int command_exists(const char *cmd) {
 }
 
 static int file_exists(const char *path) {
-    struct stat st;
-    return path && stat(path, &st) == 0;
+return loogal_platform_path_exists(path);
 }
 
 static int make_dirname(const char *path, char *out, size_t out_sz) {

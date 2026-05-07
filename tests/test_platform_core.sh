@@ -46,6 +46,10 @@ int main(void) {
         return fail("path_exists dir failed");
     }
 
+    if (!loogal_platform_executable_exists("/bin/sh")) {
+        return fail("executable_exists failed");
+    }
+
     if (!loogal_platform_file_readable(src)) {
         return fail("file_readable failed");
     }

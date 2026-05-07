@@ -45,6 +45,12 @@ int loogal_platform_file_exists(const char *path) {
     return S_ISREG(st.st_mode) ? 1 : 0;
 }
 
+int loogal_platform_executable_exists(const char *path) {
+    if (!path || !path[0]) return 0;
+
+    return access(path, X_OK) == 0 ? 1 : 0;
+}
+
 int loogal_platform_file_readable(const char *path) {
     if (!path || !path[0]) return 0;
 
