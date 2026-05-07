@@ -12,6 +12,7 @@ typedef struct {
     LoogalMemory memory;
     size_t scanned_files;
     size_t skipped_files;
+size_t known_unchanged_skipped;
     int fresh;
     int dry_run;
 int hash_mode_v0;
@@ -101,13 +102,28 @@ return 0;
 }
 
 static int visitor(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
-    (void)sb;
     (void)ftwbuf;
 
     if (typeflag != FTW_F) return 0;
     if (!image_is_supported(fpath)) return 0;
 
     g_ctx->scanned_files++;
+
+    if (!g_ctx->fresh && sb) {
+        uint64_t file_size = (uint64_t)sb->st_size;
+        uint64_t mtime_unix = (uint64_t)sb->st_mtime;
+
+        if (loogal_memory_mark_known_location_if_unchanged(
+                &g_ctx->memory,
+                fpath,
+                file_size,
+                mtime_unix,
+                1
+            )) {
+            g_ctx->known_unchanged_skipped++;
+            return 0;
+        }
+    }
 
     LoogalImageInfo info;
     if ((g_ctx->hash_mode_v0 ? image_probe_v0(fpath, &info) : image_probe(fpath, &info)) == 0) {
@@ -171,31 +187,38 @@ int cmd_index(int argc, char **argv) {
         }
     }
 
-    LoogalRecord *records = NULL;
-    size_t record_count = 0;
+int changed = ctx.fresh ||
+ctx.memory.seen_new_identities > 0 ||
+ctx.memory.seen_new_locations > 0 ||
+ctx.memory.seen_duplicate_locations > 0 ||
+ctx.memory.seen_modified_paths > 0;
 
-    if (loogal_memory_build_records(&ctx.memory, &records, &record_count) != 0) {
-        loogal_memory_free(&ctx.memory);
-        loogal_die("index", "failed building active memory projection");
-        return 1;
-    }
+LoogalRecord *records = NULL;
+size_t record_count = ctx.memory.location_count;
 
-    if (!ctx.dry_run) {
-        if (loogal_memory_save(&ctx.memory) != 0) {
-            free(records);
-            loogal_memory_free(&ctx.memory);
-            loogal_die("index", "failed saving memory files");
-            return 1;
-        }
-        write_compat_records_jsonl(records, record_count);
-        if (write_index_records(records, record_count) != 0) {
-            free(records);
-            loogal_memory_free(&ctx.memory);
-            loogal_die("index", "failed writing binary index");
-            return 1;
-        }
-    }
+if (changed || ctx.dry_run) {
+if (loogal_memory_build_records(&ctx.memory, &records, &record_count) != 0) {
+loogal_memory_free(&ctx.memory);
+loogal_die("index", "failed building active memory projection");
+return 1;
+}
+}
 
+if (!ctx.dry_run && changed) {
+if (loogal_memory_save(&ctx.memory) != 0) {
+free(records);
+loogal_memory_free(&ctx.memory);
+loogal_die("index", "failed saving memory files");
+return 1;
+}
+write_compat_records_jsonl(records, record_count);
+if (write_index_records(records, record_count) != 0) {
+free(records);
+loogal_memory_free(&ctx.memory);
+loogal_die("index", "failed writing binary index");
+return 1;
+}
+}
     printf("LOOGAL INDEX COMPLETE\n");
     printf("  Mode              : %s\n", ctx.dry_run ? "dry-run" : (ctx.fresh ? "fresh rebuild" : "bedrock merge / non-destructive"));
     printf("  Records           : %s active projection, rebuilt from durable memory\n", LOOGAL_RECORDS_PATH);
@@ -207,6 +230,8 @@ int cmd_index(int argc, char **argv) {
     printf("  Duplicate refs    : %zu\n", ctx.memory.seen_duplicate_locations);
     printf("  Modified paths    : %zu\n", ctx.memory.seen_modified_paths);
     printf("  Active records    : %zu\n", record_count);
+printf("  Known unchanged skipped: %zu\n", ctx.known_unchanged_skipped);
+printf("  Projection update : %s\n", changed ? "rebuilt" : "skipped unchanged");
     printf("  Binary index      : %s\n", LOOGAL_BIN_PATH);
     printf("  Identities        : %s\n", LOOGAL_IDENTITIES_PATH);
     printf("  Locations         : %s\n", LOOGAL_LOCATIONS_PATH);
