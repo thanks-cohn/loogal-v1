@@ -110,6 +110,8 @@ That’s enough.
 
 # Download
 
+## https://github.com/thanks-cohn/loogal/releases
+
 Download:
 
 loogal-windows.zip
