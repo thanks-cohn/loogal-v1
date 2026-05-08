@@ -106,15 +106,18 @@ Loogal flips it:
 
 That’s enough.
 
-## Windows Quick Start
-
-# Download
-
-## https://github.com/thanks-cohn/loogal/releases
+Windows Quick Start
 
 Download:
 
-loogal-windows.zip
+## https://github.com/thanks-cohn/loogal/releases
+
+
+## Loogal Windows v3
+
+Download:
+
+## loogal-windows.zip
 
 Extract it anywhere.
 
@@ -126,30 +129,50 @@ Desktop/
     ├── loogal.exe
     └── ...
 ```
+# Important:
+
+Extract the ZIP first.
+
+Do not run LoogalWindow.exe from inside the ZIP preview.
 
 Open the extracted folder.
 
-Click the address bar at the top of the folder, type:
+# Double-click:
 
-cmd
+## LoogalWindow.exe
 
-and press Enter.
+Click:
 
-In the window that opens, run:
+Add Folders (Index)
 
-loogal.exe index "%USERPROFILE%\Pictures"
+Choose folders you want Loogal to remember.
 
-After indexing finishes, double-click:
+Good starting folders:
 
-LoogalWindow.exe
+Pictures
 
-That’s it.
+Downloads
 
-Drop any image into the window.
+Screenshots
 
-Loogal will search your configured image space and show visually similar matches.
+Memes
 
-Double-click a result to reveal it in Windows Explorer.
+Art
+
+Research
+
+After indexing finishes:
+
+Click:
+
+Open Image...
+
+Choose any image.
+
+Loogal searches your visual memory and shows similar matches instantly.
+
+## Double-click a result to reveal it in Windows Explorer.
+
 
 
 
