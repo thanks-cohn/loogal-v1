@@ -13,6 +13,8 @@ int loogal_platform_dir_exists(const char *path);
 int loogal_platform_file_readable(const char *path);
 int loogal_platform_mkdir(const char *path);
 int loogal_platform_copy_file(const char *src, const char *dst);
+int loogal_platform_replace_file(const char *tmp_path, const char *final_path);
+int loogal_platform_repair_jsonl_tail(const char *path);
 
 typedef enum {
     LOOGAL_PLATFORM_ENTRY_UNKNOWN = 0,

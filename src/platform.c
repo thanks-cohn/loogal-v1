@@ -5,11 +5,18 @@
 #include <dirent.h>
 #include <errno.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+
+#if defined(_WIN32)
+#include <windows.h>
+#include <io.h>
+#define loogal_truncate_file(path, size) _chsize_s(_fileno(fopen(path, "ab")), (size))
+#endif
 
 int loogal_platform_dir_exists(const char *path) {
     if (!path || !path[0]) return 0;
@@ -272,4 +279,207 @@ uint64_t loogal_platform_now_ns(void) {
 #endif
 
     return (uint64_t)time(NULL) * 1000000000ULL;
+}
+
+
+int loogal_platform_replace_file(const char *tmp_path, const char *final_path) {
+    if (!tmp_path || !final_path || !tmp_path[0] || !final_path[0]) {
+        return -1;
+    }
+
+#if defined(_WIN32)
+    /*
+     * Windows rename() does not reliably replace an existing destination.
+     * This is the likely cause of:
+     *   first index succeeds
+     *   second index fails saving memory files
+     */
+    if (MoveFileExA(
+            tmp_path,
+            final_path,
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+        )) {
+        return 0;
+    }
+
+    return -1;
+#else
+    return rename(tmp_path, final_path);
+#endif
+}
+
+int loogal_platform_repair_jsonl_tail(const char *path) {
+    if (!path || !path[0]) return -1;
+
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0; /* missing file is fine */
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return -1;
+    }
+
+    long end = ftell(f);
+    if (end <= 0) {
+        fclose(f);
+        return 0;
+    }
+
+    long pos = end - 1;
+    int c = 0;
+
+    if (fseek(f, pos, SEEK_SET) != 0) {
+        fclose(f);
+        return -1;
+    }
+
+    c = fgetc(f);
+
+    /*
+     * If the file ends in a newline, the byte-level append completed.
+     * But the final JSONL record may still be malformed, for example:
+     *   {"broken":
+     *
+     * Validate the final non-empty line using a brutal schema-light rule:
+     * a usable JSONL object line must begin with '{' and end with '}'.
+     */
+    if (c == '\n') {
+        long line_end = pos;
+        long scan = pos - 1;
+        int ch = 0;
+
+        while (scan >= 0) {
+            if (fseek(f, scan, SEEK_SET) != 0) {
+                fclose(f);
+                return -1;
+            }
+
+            ch = fgetc(f);
+            if (ch == '\n') break;
+            scan--;
+        }
+
+        long line_start = scan + 1;
+
+        while (line_start < line_end) {
+            if (fseek(f, line_start, SEEK_SET) != 0) {
+                fclose(f);
+                return -1;
+            }
+
+            ch = fgetc(f);
+            if (ch != ' ' && ch != '\t' && ch != '\r') break;
+            line_start++;
+        }
+
+        long line_last = line_end - 1;
+
+        while (line_last >= line_start) {
+            if (fseek(f, line_last, SEEK_SET) != 0) {
+                fclose(f);
+                return -1;
+            }
+
+            ch = fgetc(f);
+            if (ch != ' ' && ch != '\t' && ch != '\r') break;
+            line_last--;
+        }
+
+        int first_ok = 0;
+        int last_ok = 0;
+
+        if (line_start <= line_last) {
+            if (fseek(f, line_start, SEEK_SET) != 0) {
+                fclose(f);
+                return -1;
+            }
+            first_ok = (fgetc(f) == '{');
+
+            if (fseek(f, line_last, SEEK_SET) != 0) {
+                fclose(f);
+                return -1;
+            }
+            last_ok = (fgetc(f) == '}');
+        }
+
+        if (first_ok && last_ok) {
+            fclose(f);
+            return 0;
+        }
+
+        /*
+         * Final line is malformed. Truncate back to the previous complete line.
+         */
+        fclose(f);
+
+#if defined(_WIN32)
+        {
+            int fd;
+            FILE *wf = fopen(path, "ab");
+            if (!wf) return -1;
+            fd = _fileno(wf);
+            if (_chsize_s(fd, line_start > 0 ? (line_start - 1) + 1 : 0) != 0) {
+                fclose(wf);
+                return -1;
+            }
+            fclose(wf);
+            return 0;
+        }
+#else
+        return truncate(path, line_start > 0 ? (line_start - 1) + 1 : 0);
+#endif
+    }
+
+    /* Walk back to previous newline. */
+    while (pos > 0) {
+        pos--;
+
+        if (fseek(f, pos, SEEK_SET) != 0) {
+            fclose(f);
+            return -1;
+        }
+
+        c = fgetc(f);
+
+        if (c == '\n') {
+            long keep = pos + 1;
+            fclose(f);
+
+#if defined(_WIN32)
+            {
+                int fd;
+                FILE *wf = fopen(path, "ab");
+                if (!wf) return -1;
+                fd = _fileno(wf);
+                if (_chsize_s(fd, keep) != 0) {
+                    fclose(wf);
+                    return -1;
+                }
+                fclose(wf);
+                return 0;
+            }
+#else
+            return truncate(path, keep);
+#endif
+        }
+    }
+
+    fclose(f);
+
+#if defined(_WIN32)
+    {
+        int fd;
+        FILE *wf = fopen(path, "wb");
+        if (!wf) return -1;
+        fd = _fileno(wf);
+        if (_chsize_s(fd, 0) != 0) {
+            fclose(wf);
+            return -1;
+        }
+        fclose(wf);
+        return 0;
+    }
+#else
+    return truncate(path, 0);
+#endif
 }

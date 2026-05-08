@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700
 #include "memory.h"
 #include "hash.h"
+#include "loogal/platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -168,6 +169,10 @@ int loogal_memory_load(LoogalMemory *m) {
     loogal_memory_init(m);
     ensure_dirs();
 
+    loogal_platform_repair_jsonl_tail(LOOGAL_IDENTITIES_PATH);
+    loogal_platform_repair_jsonl_tail(LOOGAL_LOCATIONS_PATH);
+    loogal_platform_repair_jsonl_tail(LOOGAL_EVENTS_PATH);
+
     FILE *f = fopen(LOOGAL_IDENTITIES_PATH, "r");
     if (f) {
         char line[4096];
@@ -286,8 +291,8 @@ int loogal_memory_save(const LoogalMemory *m) {
 
     if (write_identities_tmp(m, itmp) != 0) return -1;
     if (write_locations_tmp(m, ltmp) != 0) return -1;
-    if (rename(itmp, LOOGAL_IDENTITIES_PATH) != 0) return -1;
-    if (rename(ltmp, LOOGAL_LOCATIONS_PATH) != 0) return -1;
+    if (loogal_platform_replace_file(itmp, LOOGAL_IDENTITIES_PATH) != 0) return -1;
+    if (loogal_platform_replace_file(ltmp, LOOGAL_LOCATIONS_PATH) != 0) return -1;
 
     return 0;
 }
