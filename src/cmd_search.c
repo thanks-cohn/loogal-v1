@@ -83,26 +83,24 @@ static int starts_with_path(const char *path, const char *prefix) {
     return path[n] == '\0' || path[n] == '/';
 }
 
-static void normalize_path_best_effort(const char *in, char *out, size_t n) {
-    if (!out || n == 0) return;
+static void normalize_path_best_effort(const char *in, char *out, size_t out_sz) {
+    char resolved[LOOGAL_PATH_MAX];
 
-    if (!in || !*in) {
-        snprintf(out, n, "%s", "");
+    if (!in || !out || out_sz == 0) return;
+
+#if defined(_WIN32)
+    if (_fullpath(resolved, in, sizeof(resolved))) {
+        snprintf(out, out_sz, "%s", resolved);
         return;
     }
-
-    char resolved[PATH_MAX];
-
+#else
     if (realpath(in, resolved)) {
-        size_t len = strlen(resolved);
-
-        if (len >= n) len = n - 1;
-
-        memcpy(out, resolved, len);
-        out[len] = '\0';
-    } else {
-        snprintf(out, n, "%s", in);
+        snprintf(out, out_sz, "%s", resolved);
+        return;
     }
+#endif
+
+    snprintf(out, out_sz, "%s", in);
 }
 
 static int search_extract_string_field(const char *line, const char *key, char *out, size_t out_sz) {
