@@ -108,7 +108,7 @@ That’s enough.
 
 Windows Quick Start
 
-Download:
+## Download:
 
 ## https://github.com/thanks-cohn/loogal/releases
 
