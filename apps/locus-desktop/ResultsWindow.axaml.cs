@@ -2,33 +2,47 @@ using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Input;
 using Avalonia.Media;
-using Avalonia;
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace locus_desktop;
 
 public partial class ResultsWindow : Window
 {
+    private readonly List<Border> _cards = new();
+    private readonly List<LoogalResult> _results = new();
+    private int _selectedIndex = 0;
+
     public ResultsWindow(LoogalSearchResponse response)
     {
         InitializeComponent();
 
-        HeaderText.Text = $"LOCUS Results — showing {response.Results.Count} of {response.TotalHits} hits";
+        _results = response.Results.ToList();
 
-        foreach (var r in response.Results)
-            ResultsWrap.Children.Add(BuildCard(r));
+        HeaderText.Text = $"LOCUS Results — showing {_results.Count} of {response.TotalHits} hits";
 
-        Opened += (_, _) => Focus();
+        foreach (var r in _results)
+            ResultsWrap.Children.Add(BuildCard(r, _cards.Count));
+
         KeyDown += OnKeyDown;
+
+        Opened += (_, _) =>
+        {
+            Focus();
+            if (_cards.Count > 0)
+                SelectIndex(0);
+        };
     }
 
-    private Control BuildCard(LoogalResult r)
+    private Control BuildCard(LoogalResult r, int index)
     {
         var image = new Image
         {
             Width = 240,
             Height = 180,
-            Stretch = Avalonia.Media.Stretch.UniformToFill
+            Stretch = Stretch.UniformToFill
         };
 
         try
@@ -41,20 +55,20 @@ public partial class ResultsWindow : Window
         var title = new TextBlock
         {
             Text = $"{r.SimilarityPercent:0.##}% {r.Label}",
-            FontWeight = Avalonia.Media.FontWeight.Bold
+            FontWeight = FontWeight.Bold
         };
 
         var name = new TextBlock
         {
             Text = Path.GetFileName(r.Path),
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            TextWrapping = TextWrapping.Wrap,
             MaxWidth = 220
         };
 
         var dir = new TextBlock
         {
             Text = Path.GetDirectoryName(r.Path) ?? "",
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            TextWrapping = TextWrapping.Wrap,
             MaxWidth = 220,
             FontSize = 11,
             Opacity = 0.65
@@ -71,63 +85,123 @@ public partial class ResultsWindow : Window
         {
             CornerRadius = new Avalonia.CornerRadius(14),
             Padding = new Avalonia.Thickness(10),
+            BorderThickness = new Avalonia.Thickness(2),
+            BorderBrush = Brushes.Transparent,
+            Background = Brushes.Transparent,
             Child = stack,
-            Focusable = true,
-            RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
-            RenderTransform = new ScaleTransform(1.0, 1.0)
+            Focusable = true
         };
 
         border.PointerEntered += (_, _) =>
         {
-            border.ZIndex = 100;
-            border.RenderTransform = new ScaleTransform(1.10, 1.10);
-            border.Background = new SolidColorBrush(Color.FromArgb(28, 255, 255, 255));
+            if (index != _selectedIndex)
+                border.BorderBrush = new SolidColorBrush(Color.FromArgb(90, 160, 160, 160));
         };
 
         border.PointerExited += (_, _) =>
         {
-            border.ZIndex = 0;
-            border.RenderTransform = new ScaleTransform(1.0, 1.0);
-            border.Background = Brushes.Transparent;
+            if (index != _selectedIndex)
+                border.BorderBrush = Brushes.Transparent;
         };
-
-        border.DoubleTapped += (_, _) => LoogalCli.Reveal(r.Path);
 
         border.PointerPressed += (_, e) =>
         {
-            border.Focus();
-            border.RenderTransform = new ScaleTransform(1.14, 1.14);
+            SelectIndex(index);
 
             if (e.ClickCount >= 2)
-                LoogalCli.Reveal(r.Path);
+                RevealSelected();
         };
 
+        border.DoubleTapped += (_, _) =>
+        {
+            SelectIndex(index);
+            RevealSelected();
+        };
+
+        _cards.Add(border);
         return border;
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        var step = 90.0;
+        if (_cards.Count == 0)
+            return;
 
-        if (e.Key == Key.Down)
+        var columns = EstimateColumns();
+
+        if (e.Key == Key.Right)
         {
-            ResultsScroll.Offset = ResultsScroll.Offset.WithY(ResultsScroll.Offset.Y + step);
+            SelectIndex(_selectedIndex + 1);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Left)
+        {
+            SelectIndex(_selectedIndex - 1);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Down)
+        {
+            SelectIndex(_selectedIndex + columns);
             e.Handled = true;
         }
         else if (e.Key == Key.Up)
         {
-            ResultsScroll.Offset = ResultsScroll.Offset.WithY(ResultsScroll.Offset.Y - step);
+            SelectIndex(_selectedIndex - columns);
             e.Handled = true;
         }
-        else if (e.Key == Key.PageDown)
+        else if (e.Key == Key.Enter)
         {
-            ResultsScroll.Offset = ResultsScroll.Offset.WithY(ResultsScroll.Offset.Y + 600);
+            RevealSelected();
             e.Handled = true;
         }
-        else if (e.Key == Key.PageUp)
+    }
+
+    private int EstimateColumns()
+    {
+        var width = Bounds.Width;
+
+        if (width <= 0)
+            return 4;
+
+        return Math.Max(1, (int)(width / 290));
+    }
+
+    private void SelectIndex(int index)
+    {
+        if (_cards.Count == 0)
+            return;
+
+        if (index < 0)
+            index = 0;
+
+        if (index >= _cards.Count)
+            index = _cards.Count - 1;
+
+        _selectedIndex = index;
+
+        for (var i = 0; i < _cards.Count; i++)
         {
-            ResultsScroll.Offset = ResultsScroll.Offset.WithY(ResultsScroll.Offset.Y - 600);
-            e.Handled = true;
+            if (i == _selectedIndex)
+            {
+                _cards[i].BorderBrush = new SolidColorBrush(Color.FromArgb(220, 175, 175, 175));
+                _cards[i].Background = new SolidColorBrush(Color.FromArgb(28, 180, 180, 180));
+            }
+            else
+            {
+                _cards[i].BorderBrush = Brushes.Transparent;
+                _cards[i].Background = Brushes.Transparent;
+            }
         }
+
+        _cards[_selectedIndex].Focus();
+        _cards[_selectedIndex].BringIntoView();
+    }
+
+    private void RevealSelected()
+    {
+        if (_selectedIndex < 0 || _selectedIndex >= _results.Count)
+            return;
+
+        LoogalCli.Reveal(_results[_selectedIndex].Path);
     }
 }
