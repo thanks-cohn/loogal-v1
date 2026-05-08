@@ -106,6 +106,42 @@ Loogal flips it:
 
 That’s enough.
 
+## Windows Quick Start
+
+# Download
+
+Download:
+
+loogal-windows.zip
+
+Extract it anywhere.
+
+Example:
+```text
+Desktop/
+└── loogal-windows/
+    ├── LoogalWindow.exe
+    ├── loogal.exe
+    └── ...
+```
+Run
+
+Double-click:
+
+LoogalWindow.exe
+
+That’s it.
+
+Search
+
+Drop any image into the window.
+
+Loogal will search your configured image space and show visually similar matches.
+
+Double-click a result to reveal it in Windows Explorer.
+
+
+
 --------------------------------------------------------------------------------
 
 WHAT MAKES THIS WORK
