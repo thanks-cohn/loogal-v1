@@ -1,5 +1,0 @@
-path	schedule	time	date	day	enabled
-/home/big-bro/Pictures	daily	00:00			enabled
-/home/big-bro/Downloads	hourly				enabled
-/home/big-bro/Projects	weekly	03:00		sun	enabled
-/home/big-bro/	yearly	00:00	05-23		enabled

@@ -24,6 +24,12 @@ public partial class ResultsWindow : Window
 
         HeaderText.Text = $"LOCUS Results — showing {_results.Count} of {response.TotalHits} hits";
 
+        SearchButton.Click += (_, _) =>
+        {
+            var win = new MainWindow();
+            win.Show();
+        };
+
         foreach (var r in _results)
             ResultsWrap.Children.Add(BuildCard(r, _cards.Count));
 

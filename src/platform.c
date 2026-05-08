@@ -116,7 +116,11 @@ int loogal_platform_file_size(const char *path, uint64_t *out_size) {
 int loogal_platform_mkdir(const char *path) {
     if (!path || !path[0]) return -1;
 
+#if defined(_WIN32)
+    if (mkdir(path) == 0) {
+#else
     if (mkdir(path, 0755) == 0) {
+#endif
         return 0;
     }
 
@@ -192,7 +196,9 @@ static int loogal_platform_join_path(char *out, size_t out_sz, const char *a, co
 static LoogalPlatformEntryType loogal_platform_entry_type_from_mode(mode_t mode) {
     if (S_ISREG(mode)) return LOOGAL_PLATFORM_ENTRY_FILE;
     if (S_ISDIR(mode)) return LOOGAL_PLATFORM_ENTRY_DIR;
+#if defined(S_ISLNK)
     if (S_ISLNK(mode)) return LOOGAL_PLATFORM_ENTRY_SYMLINK;
+#endif
     return LOOGAL_PLATFORM_ENTRY_OTHER;
 }
 
@@ -225,7 +231,7 @@ static int loogal_platform_walk_inner(const char *root, uint64_t depth, LoogalPl
 
         struct stat st;
 
-        if (lstat(child, &st) != 0) {
+        if (stat(child, &st) != 0) {
             continue;
         }
 
