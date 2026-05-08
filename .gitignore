@@ -91,3 +91,7 @@ manifests/*
 !data/.gitkeep
 !logs/.gitkeep
 !manifests/.gitkeep
+
+# Avalonia / .NET build output
+**/bin/
+**/obj/
