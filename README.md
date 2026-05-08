@@ -124,15 +124,24 @@ Desktop/
     ├── loogal.exe
     └── ...
 ```
-Run
 
-Double-click:
+Open the extracted folder.
+
+Click the address bar at the top of the folder, type:
+
+cmd
+
+and press Enter.
+
+In the window that opens, run:
+
+loogal.exe index "%USERPROFILE%\Pictures"
+
+After indexing finishes, double-click:
 
 LoogalWindow.exe
 
 That’s it.
-
-Search
 
 Drop any image into the window.
 
