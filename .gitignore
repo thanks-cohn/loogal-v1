@@ -95,3 +95,7 @@ manifests/*
 # Avalonia / .NET build output
 **/bin/
 **/obj/
+
+# Avalonia / .NET build output
+**/bin/
+**/obj/
