@@ -113,11 +113,12 @@ Windows Quick Start
 ## https://github.com/thanks-cohn/loogal/releases
 
 
-## Loogal Windows v3
+## Loogal Windows v4
 
 Download:
 
-## loogal-windows.zip
+## Loogal-Windows-v4.zip
+
 
 Extract it anywhere.
 
@@ -388,8 +389,16 @@ Even if that PDF is:
   moved
   reorganized
 
+
 Search still resolves.
 
 Because Loogal tracks the documen, not just the path.
+Loogal stores human-readable truth in JSONL
+and executes search from a packed binary index.
 
+The memory layer is inspectable.
+The search layer is optimized for speed.
+
+Learn slow.
+Recall instantly.
 --------------------------------------------------------------------------------
