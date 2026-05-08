@@ -6,7 +6,8 @@
         Height="900"
         Focusable="True">
 
-  <Grid RowDefinitions="Auto,*" Margin="18">
+  <Grid Name="RootGrid" RowDefinitions="Auto,*" Margin="18">
+
     <TextBlock Grid.Row="0"
                Name="HeaderText"
                Text="LOCUS Results"
@@ -19,6 +20,38 @@
                   Margin="0,14,0,0">
       <WrapPanel Name="ResultsWrap"/>
     </ScrollViewer>
+
+    <Border Name="Lightbox"
+            Grid.RowSpan="2"
+            Background="#EE000000"
+            IsVisible="False"
+            Padding="28"
+            CornerRadius="16">
+      <Grid RowDefinitions="*,Auto">
+        <Image Name="LightboxImage"
+               Grid.Row="0"
+               Stretch="Uniform"/>
+
+        <StackPanel Grid.Row="1"
+                    Margin="0,18,0,0"
+                    Spacing="6">
+          <TextBlock Name="LightboxTitle"
+                     FontSize="18"
+                     FontWeight="Bold"
+                     TextWrapping="Wrap"/>
+
+          <TextBlock Name="LightboxPath"
+                     FontSize="12"
+                     Opacity="0.75"
+                     TextWrapping="Wrap"/>
+
+          <TextBlock Text="Left / Right = previous / next · Escape = close"
+                     FontSize="12"
+                     Opacity="0.55"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
   </Grid>
 
 </Window>

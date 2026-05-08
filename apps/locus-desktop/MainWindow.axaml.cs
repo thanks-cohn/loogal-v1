@@ -148,25 +148,39 @@ public partial class MainWindow : Window
 
             var progressTask = Task.Run(async () =>
             {
-                var fake = 0.0;
+                var watch = Stopwatch.StartNew();
+                var pct = 0.0;
+                var tick = 0;
 
                 while (!proc.HasExited)
                 {
-                    fake += 1.5;
+                    tick++;
 
-                    if (fake > 96.0)
-                        fake = 96.0;
+                    if (pct < 92.0)
+                        pct += Math.Max(0.12, (92.0 - pct) * 0.018);
 
-                    var pct = fake;
+                    if (pct > 92.0)
+                        pct = 92.0;
+
+                    var dots = new string('.', tick % 4);
+                    var elapsed = watch.Elapsed;
 
                     await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         IndexProgress.Value = pct;
+
                         ProgressText.Text =
-                            $"Indexing {totalImages} detected images · {pct:0.0}%";
+                            $"Indexing {totalImages} detected images{dots} · {pct:0.0}% · {elapsed:mm\\:ss} elapsed";
+
+                        StatusText.Text =
+                            $"LOCUS is indexing:\n{path}\n\n" +
+                            $"Detected images: {totalImages}\n" +
+                            $"Progress: {pct:0.0}%\n" +
+                            $"Elapsed: {elapsed:mm\\:ss}\n\n" +
+                            "Still working. Finalizing may take a little longer on large folders.";
                     });
 
-                    await Task.Delay(180);
+                    await Task.Delay(350);
                 }
             });
 

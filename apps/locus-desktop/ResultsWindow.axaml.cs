@@ -14,6 +14,7 @@ public partial class ResultsWindow : Window
     private readonly List<Border> _cards = new();
     private readonly List<LoogalResult> _results = new();
     private int _selectedIndex = 0;
+    private bool _lightboxOpen = false;
 
     public ResultsWindow(LoogalSearchResponse response)
     {
@@ -71,8 +72,11 @@ public partial class ResultsWindow : Window
             TextWrapping = TextWrapping.Wrap,
             MaxWidth = 220,
             FontSize = 11,
-            Opacity = 0.65
+            Opacity = 0.65,
+            Cursor = new Cursor(StandardCursorType.Hand)
         };
+
+        dir.PointerPressed += (_, _) => LoogalCli.Reveal(r.Path);
 
         var stack = new StackPanel
         {
@@ -109,13 +113,13 @@ public partial class ResultsWindow : Window
             SelectIndex(index);
 
             if (e.ClickCount >= 2)
-                RevealSelected();
+                OpenLightbox(index);
         };
 
         border.DoubleTapped += (_, _) =>
         {
             SelectIndex(index);
-            RevealSelected();
+            OpenLightbox(index);
         };
 
         _cards.Add(border);
@@ -126,6 +130,29 @@ public partial class ResultsWindow : Window
     {
         if (_cards.Count == 0)
             return;
+
+        if (_lightboxOpen)
+        {
+            if (e.Key == Key.Right)
+            {
+                SelectIndex(_selectedIndex + 1);
+                UpdateLightbox();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Left)
+            {
+                SelectIndex(_selectedIndex - 1);
+                UpdateLightbox();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                CloseLightbox();
+                e.Handled = true;
+            }
+
+            return;
+        }
 
         var columns = EstimateColumns();
 
@@ -149,9 +176,9 @@ public partial class ResultsWindow : Window
             SelectIndex(_selectedIndex - columns);
             e.Handled = true;
         }
-        else if (e.Key == Key.Enter)
+        else if (e.Key == Key.Enter || e.Key == Key.Space)
         {
-            RevealSelected();
+            OpenLightbox(_selectedIndex);
             e.Handled = true;
         }
     }
@@ -197,11 +224,39 @@ public partial class ResultsWindow : Window
         _cards[_selectedIndex].BringIntoView();
     }
 
-    private void RevealSelected()
+    private void OpenLightbox(int index)
+    {
+        SelectIndex(index);
+        _lightboxOpen = true;
+        Lightbox.IsVisible = true;
+        UpdateLightbox();
+        Focus();
+    }
+
+    private void CloseLightbox()
+    {
+        _lightboxOpen = false;
+        Lightbox.IsVisible = false;
+        Focus();
+    }
+
+    private void UpdateLightbox()
     {
         if (_selectedIndex < 0 || _selectedIndex >= _results.Count)
             return;
 
-        LoogalCli.Reveal(_results[_selectedIndex].Path);
+        var r = _results[_selectedIndex];
+
+        try
+        {
+            LightboxImage.Source = File.Exists(r.Path) ? new Bitmap(r.Path) : null;
+        }
+        catch
+        {
+            LightboxImage.Source = null;
+        }
+
+        LightboxTitle.Text = $"{_selectedIndex + 1} / {_results.Count} · {r.SimilarityPercent:0.##}% {r.Label} · {Path.GetFileName(r.Path)}";
+        LightboxPath.Text = r.Path;
     }
 }
