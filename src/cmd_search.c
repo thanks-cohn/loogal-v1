@@ -93,6 +93,12 @@ static void normalize_path_best_effort(const char *in, char *out, size_t n) {
 
     char resolved[PATH_MAX];
 
+    #ifdef _WIN32
+    if (_fullpath(resolved, in, sizeof(resolved))) {
+        snprintf(out, n, "%s", resolved);
+        return;
+    }
+    #else
     if (realpath(in, resolved)) {
         size_t len = strlen(resolved);
 
@@ -103,6 +109,7 @@ static void normalize_path_best_effort(const char *in, char *out, size_t n) {
     } else {
         snprintf(out, n, "%s", in);
     }
+    #endif
 }
 
 static int search_extract_string_field(const char *line, const char *key, char *out, size_t out_sz) {

@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
 
 static int quote_sh(const char *in, char *out, size_t out_sz) {
     if (!in || !out || out_sz < 3) return -1;

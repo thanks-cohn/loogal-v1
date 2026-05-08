@@ -10,7 +10,11 @@
 static void audit_ts(char *buf, size_t n) {
     time_t t = time(NULL);
     struct tm tmv;
+    #ifdef _WIN32
+    localtime_s(&tmv, &t);
+#else
     localtime_r(&t, &tmv);
+#endif
     strftime(buf, n, "%Y-%m-%dT%H:%M:%S%z", &tmv);
 }
 
