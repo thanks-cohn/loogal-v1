@@ -14,6 +14,9 @@ x86_64-w64-mingw32-gcc \
 -Wall \
 -Wextra \
 -std=gnu11 \
+-static \
+-static-libgcc \
+-static-libstdc++ \
 -DWIN32 \
 -D_WINDOWS \
 -Iinclude \
