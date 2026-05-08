@@ -82,3 +82,12 @@ releases/*.exe
 
 # local Loogal memory / personal indexed data
 data/
+
+# LOCUS / Loogal runtime memory
+data/*
+logs/*
+manifests/*
+
+!data/.gitkeep
+!logs/.gitkeep
+!manifests/.gitkeep

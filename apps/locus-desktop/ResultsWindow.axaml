@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="locus_desktop.ResultsWindow"
+        Title="Results"
+        Width="1280"
+        Height="900"
+        Focusable="True">
+
+  <Grid RowDefinitions="Auto,*" Margin="18">
+    <TextBlock Grid.Row="0"
+               Name="HeaderText"
+               Text="LOCUS Results"
+               FontSize="18"
+               FontWeight="Bold"
+               Opacity="0.9"/>
+
+    <ScrollViewer Grid.Row="1"
+                  Name="ResultsScroll"
+                  Margin="0,14,0,0">
+      <WrapPanel Name="ResultsWrap"/>
+    </ScrollViewer>
+  </Grid>
+
+</Window>

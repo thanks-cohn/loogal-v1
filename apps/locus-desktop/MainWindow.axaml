@@ -1,0 +1,82 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="locus_desktop.MainWindow"
+        Title="LOCUS"
+        Width="1120"
+        Height="800">
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="24">
+
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+      <StackPanel Grid.Column="0" Spacing="8">
+        <TextBlock Text="LOCUS"
+                   FontSize="34"
+                   FontWeight="Bold"/>
+
+        <TextBlock Text="local visual memory"
+                   FontSize="16"
+                   Opacity="0.7"/>
+      </StackPanel>
+
+      <Button Grid.Column="1"
+              Name="IndexButton"
+              Content="Select Directory to Index"
+              Width="250"
+              Height="48"
+              VerticalAlignment="Center"
+              FontWeight="Bold"/>
+    </Grid>
+
+    <Border Grid.Row="1"
+            Margin="0,24,0,24"
+            CornerRadius="18"
+            BorderThickness="2"
+            Padding="40">
+
+      <StackPanel HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  Spacing="18"
+                  Width="640">
+
+        <TextBlock Text="Drop image here"
+                   FontSize="32"
+                   HorizontalAlignment="Center"/>
+
+        <TextBlock Text="or choose image"
+                   FontSize="16"
+                   Opacity="0.7"
+                   HorizontalAlignment="Center"/>
+
+        <Button Name="ChooseButton"
+                Content="Choose Image"
+                Width="220"
+                Height="52"/>
+
+        <StackPanel Spacing="8" Margin="0,24,0,0">
+          <ProgressBar Name="IndexProgress"
+                       Minimum="0"
+                       Maximum="100"
+                       Value="0"
+                       Height="14"
+                       CornerRadius="7"
+                       IsVisible="False"/>
+
+          <TextBlock Name="ProgressText"
+                     Text=""
+                     FontSize="13"
+                     Opacity="0.75"
+                     HorizontalAlignment="Center"
+                     IsVisible="False"/>
+        </StackPanel>
+
+      </StackPanel>
+
+    </Border>
+
+    <TextBlock Grid.Row="2"
+               Name="StatusText"
+               Text="waiting..."
+               TextWrapping="Wrap"
+               Opacity="0.8"/>
+  </Grid>
+</Window>
