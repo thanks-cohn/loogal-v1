@@ -1,7 +1,0 @@
-/home/big-bro/Desktop/loogal/loogal/releases/loogal-windows/LoogalWindow.pdb
-/home/big-bro/Desktop/loogal/loogal/releases/loogal-windows/D3DCompiler_47_cor3.dll
-/home/big-bro/Desktop/loogal/loogal/releases/loogal-windows/PenImc_cor3.dll
-/home/big-bro/Desktop/loogal/loogal/releases/loogal-windows/PresentationNative_cor3.dll
-/home/big-bro/Desktop/loogal/loogal/releases/loogal-windows/vcruntime140_cor3.dll
-/home/big-bro/Desktop/loogal/loogal/releases/loogal-windows/wpfgfx_cor3.dll
-/home/big-bro/Desktop/loogal/loogal/releases/loogal-windows/LoogalWindow.exe

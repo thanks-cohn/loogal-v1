@@ -82,3 +82,8 @@ releases/*.exe
 
 # local Loogal memory / personal indexed data
 data/
+
+# Windows build output
+windows/LoogalWindow/bin/
+windows/LoogalWindow/obj/
+releases/
