@@ -120,9 +120,7 @@ Download:
 ## Locus-v7-windows-working-gui.zip
 
 
-
-
-Extract it anywhere.
+## EXTRACT it anywhere.
 
 Example:
 ```text
@@ -132,6 +130,12 @@ Desktop/
     ├── LOCUS.exe
     └── ...
 ```
+
+## CLICK
+
+locus-desktop.exe
+
+# Done
 # Important:
 
 Extract the ZIP first.
