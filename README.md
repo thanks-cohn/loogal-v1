@@ -131,13 +131,6 @@ Desktop/
     └── ...
 ```
 
-## CLICK
-
-locus-desktop.exe
-
-# Done
-# Important:
-
 Extract the ZIP first.
 
 Do not run LOCUSWindow.exe from inside the ZIP preview.
@@ -146,7 +139,7 @@ Open the extracted folder.
 
 # Double-click:
 
-## LOCUSWindow.exe
+## locus-desktop.exe
 
 Click:
 
