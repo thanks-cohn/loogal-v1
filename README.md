@@ -1,11 +1,11 @@
 Click.Drop.Done
 ==========================================
-## Locus 
+## LOCUS 
 
 
-WHAT IS Locus?
+WHAT IS LOCUS?
 
-Locus is like:
+LOCUS is like:
 
   Google Images search
   + Finder / File Explorer
@@ -13,7 +13,7 @@ Locus is like:
 
 But entirely local.
 
-It's as easy as selecting an image, dropping it in the Locus window and...
+It's as easy as selecting an image, dropping it in the LOCUS window and...
 
 
 
@@ -27,7 +27,7 @@ THE MOMENT
 
 You open:
 
-  ./Locus-window
+  ./LOCUS-window
 
 You drag an image in.
 
@@ -73,9 +73,9 @@ It's about time!
 
 --------------------------------------------------------------------------------
 
-WHAT Locus IS
+WHAT LOCUS IS
 
-Locus is a local visual memory engine.
+LOCUS is a local visual memory engine.
 
 It replaces:
 
@@ -100,7 +100,7 @@ Every other system asks you to remember:
   tags
   where you saved something
 
-Locus flips it:
+LOCUS flips it:
 
   you remember what it looked like
 
@@ -110,14 +110,15 @@ Windows Quick Start
 
 ## Download:
 
-## https://github.com/thanks-cohn/Locus/releases
+## https://github.com/thanks-cohn/LOCUS/releases
 
 
 ## Locus V7 - Windows Working GUI Edition Latest
 
 Download:
 
-## Locus V7 - Windows Working GUI Edition Latest.zip
+## Locus-v7-windows-working-gui.zip
+
 
 
 
@@ -126,28 +127,28 @@ Extract it anywhere.
 Example:
 ```text
 Desktop/
-└── Locus-windows/
-    ├── LocusWindow.exe
-    ├── Locus.exe
+└── LOCUS-windows/
+    ├── LOCUSWindow.exe
+    ├── LOCUS.exe
     └── ...
 ```
 # Important:
 
 Extract the ZIP first.
 
-Do not run LocusWindow.exe from inside the ZIP preview.
+Do not run LOCUSWindow.exe from inside the ZIP preview.
 
 Open the extracted folder.
 
 # Double-click:
 
-## LocusWindow.exe
+## LOCUSWindow.exe
 
 Click:
 
 Add Folders (Index)
 
-Choose folders you want Locus to remember.
+Choose folders you want LOCUS to remember.
 
 Good starting folders:
 
@@ -171,7 +172,7 @@ Open Image...
 
 Choose any image.
 
-Locus searches your visual memory and shows similar matches instantly.
+LOCUS searches your visual memory and shows similar matches instantly.
 
 ## Double-click a result to reveal it in Windows Explorer.
 
@@ -234,7 +235,7 @@ You search by MEMORY.
 
 INDEX YOUR WORLD
 
-  ./Locus index ~/Pictures
+  ./LOCUS index ~/Pictures
 
 Scans your image universe.
 Builds a local visual memory engine.
@@ -246,7 +247,7 @@ The beginning.
 
 OPEN THE WINDOW
 
-  ./Locus-window
+  ./LOCUS-window
 
 Drag.
 Drop.
@@ -265,7 +266,7 @@ your image → your memory → your results
 
 SEARCH BY IMAGE
 
-  ./Locus search meme.png
+  ./LOCUS search meme.png
 
 Find every version.
 Every crop.
@@ -279,7 +280,7 @@ Even if you buried it months ago.
 
 SEARCH EVERYTHING YOU'VE INDEXED
 
-  ./Locus search screenshot.jpg --memory
+  ./LOCUS search screenshot.jpg --memory
 
 Not a folder.
 
@@ -289,7 +290,7 @@ Your ENTIRE visual memory.
 
 FIND NEAR DUPLICATES
 
-  ./Locus similar vacation_photo.png
+  ./LOCUS similar vacation_photo.png
 
 Compressed copies.
 Screenshots.
@@ -298,15 +299,15 @@ Saves from Discord.
 Telegram reposts.
 Tiny edits.
 
-Locus still remembers.
+LOCUS still remembers.
 
 ──────────────────────────────────────────────────────────────
 
 BUILD A LIVING MEMORY
 
-  ./Locus watch-add ~/Pictures --hourly
+  ./LOCUS watch-add ~/Pictures --hourly
 
-Tell Locus where your life happens.
+Tell LOCUS where your life happens.
 
 Screenshots.
 Downloads.
@@ -318,11 +319,11 @@ Research dumps.
 
 START THE DAEMON
 
-  ./Locus watch-start
+  ./LOCUS watch-start
 
 Now forget indexing exists.
 
-Locus quietly watches your world evolve.
+LOCUS quietly watches your world evolve.
 
 Every new image:
 remembered.
@@ -339,7 +340,7 @@ Forever.
 
 DEDUPE THE ABYSS
 
-  ./Locus dedupe --dry-run
+  ./LOCUS dedupe --dry-run
 
 See how much visual clutter you've accumulated.
 
@@ -361,7 +362,7 @@ THE PROMISE
 
 If the image exists anywhere on your machine...
 
-Locus should lead you back to it.
+LOCUS should lead you back to it.
 ```
 
 ---------------------------------
@@ -369,16 +370,16 @@ Locus should lead you back to it.
 
 WHAT COMES NEXT ! PDF MAVERICK
 
-Right now, Locus finds images.
+Right now, LOCUS finds images.
 
 Next, it finds images inside PDFs.
 
 You will be able to:
 
-  ./Locus index ~/Documents --include pdf
-  ./Locus search query.png ~/Documents --include pdf
+  ./LOCUS index ~/Documents --include pdf
+  ./LOCUS search query.png ~/Documents --include pdf
 
-Locus will:
+LOCUS will:
 
   extract images from PDFs
   index them
@@ -393,8 +394,8 @@ Even if that PDF is:
 
 Search still resolves.
 
-Because Locus tracks the documen, not just the path.
-Locus stores human-readable truth in JSONL
+Because LOCUS tracks the documen, not just the path.
+LOCUS stores human-readable truth in JSONL
 and executes search from a packed binary index.
 
 The memory layer is inspectable.
