@@ -1,12 +1,11 @@
-#define _XOPEN_SOURCE 700
+﻿#define _XOPEN_SOURCE 700
 #include "loogal.h"
 #include "memory.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ftw.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include <windows.h>
 
 typedef struct {
     LoogalMemory memory;
@@ -101,17 +100,27 @@ return 0;
 return 0;
 }
 
-static int visitor(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
-    (void)ftwbuf;
+static int index_one_file(const char *fpath) {
+    struct stat st;
 
-    if (typeflag != FTW_F) return 0;
-    if (!image_is_supported(fpath)) return 0;
+    printf("[walk] file: %s\n", fpath);
+
+    if (!image_is_supported(fpath)) {
+        printf("[skip] unsupported: %s\n", fpath);
+        return 0;
+    }
+
+    if (stat(fpath, &st) != 0) {
+        g_ctx->skipped_files++;
+        printf("[skip] stat failed: %s\n", fpath);
+        return 0;
+    }
 
     g_ctx->scanned_files++;
 
-    if (!g_ctx->fresh && sb) {
-        uint64_t file_size = (uint64_t)sb->st_size;
-        uint64_t mtime_unix = (uint64_t)sb->st_mtime;
+    if (!g_ctx->fresh) {
+        uint64_t file_size = (uint64_t)st.st_size;
+        uint64_t mtime_unix = (uint64_t)st.st_mtime;
 
         if (loogal_memory_mark_known_location_if_unchanged(
                 &g_ctx->memory,
@@ -126,29 +135,54 @@ static int visitor(const char *fpath, const struct stat *sb, int typeflag, struc
     }
 
     LoogalImageInfo info;
+
     if ((g_ctx->hash_mode_v0 ? image_probe_v0(fpath, &info) : image_probe(fpath, &info)) == 0) {
-if (sb) {
-info.file_size = (uint64_t)sb->st_size;
-info.mtime_unix = (uint64_t)sb->st_mtime;
-}
+        info.file_size = (uint64_t)st.st_size;
+        info.mtime_unix = (uint64_t)st.st_mtime;
 
         if (!g_ctx->dry_run) {
             loogal_memory_ingest_image(&g_ctx->memory, &info);
         }
-        if (g_ctx->scanned_files % 100 == 0) {
-            char msg[160];
-            snprintf(msg, sizeof(msg), "scanned=%zu new_identities=%zu new_locations=%zu known=%zu",
-                     g_ctx->scanned_files,
-                     g_ctx->memory.seen_new_identities,
-                     g_ctx->memory.seen_new_locations,
-                     g_ctx->memory.seen_known_locations);
-            loogal_log("index.progress", "ok", msg);
-        }
+
+        printf("[image] indexed: %s\n", fpath);
     } else {
         g_ctx->skipped_files++;
         loogal_log("index.skip", "warn", fpath);
+        printf("[skip] image probe failed: %s\n", fpath);
     }
 
+    return 0;
+}
+
+static int walk_dir_win32(const char *root) {
+    char pattern[LOOGAL_PATH_MAX];
+    WIN32_FIND_DATAA fd;
+    HANDLE h;
+
+    snprintf(pattern, sizeof(pattern), "%s\\*", root);
+
+    h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) {
+        printf("[walk-warn] cannot open: %s\n", root);
+        return -1;
+    }
+
+    do {
+        char path[LOOGAL_PATH_MAX];
+
+        if (strcmp(fd.cFileName, ".") == 0 || strcmp(fd.cFileName, "..") == 0)
+            continue;
+
+        snprintf(path, sizeof(path), "%s\\%s", root, fd.cFileName);
+
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            walk_dir_win32(path);
+        } else {
+            index_one_file(path);
+        }
+    } while (FindNextFileA(h, &fd));
+
+    FindClose(h);
     return 0;
 }
 
@@ -187,7 +221,7 @@ int cmd_index(int argc, char **argv) {
         char msg[LOOGAL_PATH_MAX + 96];
         snprintf(msg, sizeof(msg), "scanning %s", argv[i]);
         loogal_log("index.scan_dir", "ok", msg);
-        if (nftw(argv[i], visitor, 32, FTW_PHYS) != 0) {
+        if (walk_dir_win32(argv[i]) != 0) {
             loogal_log("index.scan_dir", "warn", argv[i]);
         }
     }
@@ -259,3 +293,4 @@ printf("  Projection update : %s\n", changed ? "rebuilt" : "skipped unchanged");
     g_ctx = NULL;
     return 0;
 }
+
