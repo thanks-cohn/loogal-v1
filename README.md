@@ -1,11 +1,11 @@
 Click.Drop.Done
 ==========================================
-## LOOGAL 
+## Locus 
 
 
-WHAT IS LOOGAL?
+WHAT IS Locus?
 
-Loogal is like:
+Locus is like:
 
   Google Images search
   + Finder / File Explorer
@@ -13,7 +13,7 @@ Loogal is like:
 
 But entirely local.
 
-It's as easy as selecting an image, dropping it in the loogal window and...
+It's as easy as selecting an image, dropping it in the Locus window and...
 
 
 
@@ -27,7 +27,7 @@ THE MOMENT
 
 You open:
 
-  ./loogal-window
+  ./Locus-window
 
 You drag an image in.
 
@@ -73,9 +73,9 @@ It's about time!
 
 --------------------------------------------------------------------------------
 
-WHAT LOOGAL IS
+WHAT Locus IS
 
-Loogal is a local visual memory engine.
+Locus is a local visual memory engine.
 
 It replaces:
 
@@ -100,7 +100,7 @@ Every other system asks you to remember:
   tags
   where you saved something
 
-Loogal flips it:
+Locus flips it:
 
   you remember what it looked like
 
@@ -110,14 +110,15 @@ Windows Quick Start
 
 ## Download:
 
-## https://github.com/thanks-cohn/loogal/releases
+## https://github.com/thanks-cohn/Locus/releases
 
 
-## Loogal Windows v4
+## Locus V7 - Windows Working GUI Edition Latest
 
 Download:
 
-## Loogal-Windows-v4.zip
+## Locus V7 - Windows Working GUI Edition Latest.zip
+
 
 
 Extract it anywhere.
@@ -125,28 +126,28 @@ Extract it anywhere.
 Example:
 ```text
 Desktop/
-└── loogal-windows/
-    ├── LoogalWindow.exe
-    ├── loogal.exe
+└── Locus-windows/
+    ├── LocusWindow.exe
+    ├── Locus.exe
     └── ...
 ```
 # Important:
 
 Extract the ZIP first.
 
-Do not run LoogalWindow.exe from inside the ZIP preview.
+Do not run LocusWindow.exe from inside the ZIP preview.
 
 Open the extracted folder.
 
 # Double-click:
 
-## LoogalWindow.exe
+## LocusWindow.exe
 
 Click:
 
 Add Folders (Index)
 
-Choose folders you want Loogal to remember.
+Choose folders you want Locus to remember.
 
 Good starting folders:
 
@@ -170,7 +171,7 @@ Open Image...
 
 Choose any image.
 
-Loogal searches your visual memory and shows similar matches instantly.
+Locus searches your visual memory and shows similar matches instantly.
 
 ## Double-click a result to reveal it in Windows Explorer.
 
@@ -233,7 +234,7 @@ You search by MEMORY.
 
 INDEX YOUR WORLD
 
-  ./loogal index ~/Pictures
+  ./Locus index ~/Pictures
 
 Scans your image universe.
 Builds a local visual memory engine.
@@ -245,7 +246,7 @@ The beginning.
 
 OPEN THE WINDOW
 
-  ./loogal-window
+  ./Locus-window
 
 Drag.
 Drop.
@@ -264,7 +265,7 @@ your image → your memory → your results
 
 SEARCH BY IMAGE
 
-  ./loogal search meme.png
+  ./Locus search meme.png
 
 Find every version.
 Every crop.
@@ -278,7 +279,7 @@ Even if you buried it months ago.
 
 SEARCH EVERYTHING YOU'VE INDEXED
 
-  ./loogal search screenshot.jpg --memory
+  ./Locus search screenshot.jpg --memory
 
 Not a folder.
 
@@ -288,7 +289,7 @@ Your ENTIRE visual memory.
 
 FIND NEAR DUPLICATES
 
-  ./loogal similar vacation_photo.png
+  ./Locus similar vacation_photo.png
 
 Compressed copies.
 Screenshots.
@@ -297,15 +298,15 @@ Saves from Discord.
 Telegram reposts.
 Tiny edits.
 
-Loogal still remembers.
+Locus still remembers.
 
 ──────────────────────────────────────────────────────────────
 
 BUILD A LIVING MEMORY
 
-  ./loogal watch-add ~/Pictures --hourly
+  ./Locus watch-add ~/Pictures --hourly
 
-Tell Loogal where your life happens.
+Tell Locus where your life happens.
 
 Screenshots.
 Downloads.
@@ -317,11 +318,11 @@ Research dumps.
 
 START THE DAEMON
 
-  ./loogal watch-start
+  ./Locus watch-start
 
 Now forget indexing exists.
 
-Loogal quietly watches your world evolve.
+Locus quietly watches your world evolve.
 
 Every new image:
 remembered.
@@ -338,7 +339,7 @@ Forever.
 
 DEDUPE THE ABYSS
 
-  ./loogal dedupe --dry-run
+  ./Locus dedupe --dry-run
 
 See how much visual clutter you've accumulated.
 
@@ -360,7 +361,7 @@ THE PROMISE
 
 If the image exists anywhere on your machine...
 
-Loogal should lead you back to it.
+Locus should lead you back to it.
 ```
 
 ---------------------------------
@@ -368,16 +369,16 @@ Loogal should lead you back to it.
 
 WHAT COMES NEXT ! PDF MAVERICK
 
-Right now, Loogal finds images.
+Right now, Locus finds images.
 
 Next, it finds images inside PDFs.
 
 You will be able to:
 
-  ./loogal index ~/Documents --include pdf
-  ./loogal search query.png ~/Documents --include pdf
+  ./Locus index ~/Documents --include pdf
+  ./Locus search query.png ~/Documents --include pdf
 
-Loogal will:
+Locus will:
 
   extract images from PDFs
   index them
@@ -392,8 +393,8 @@ Even if that PDF is:
 
 Search still resolves.
 
-Because Loogal tracks the documen, not just the path.
-Loogal stores human-readable truth in JSONL
+Because Locus tracks the documen, not just the path.
+Locus stores human-readable truth in JSONL
 and executes search from a packed binary index.
 
 The memory layer is inspectable.
