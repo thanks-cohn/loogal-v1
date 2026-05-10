@@ -12,7 +12,7 @@ $(BIN): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS) $(LDLIBS)
 
 clean:
-	rm -f src/*.o src/core/*.o $(BIN)
+	rm -f src/*.o src/core/*.o $(BIN) continuity-window loogal-window loogal-gallery-window
 
 safe-clean: clean
 	@echo "Preserving data/, logs/, manifests/"
@@ -59,7 +59,13 @@ test-window-api: $(BIN)
 test-thumbnail: $(BIN)
 	bash tests/test_thumbnail_module.sh
 
-.PHONY: loogal-window test-window
+.PHONY: loogal-window test-window continuity-window demo-gui
+
+continuity-window: src/gui/continuity_window.c
+	$(CC) $(CFLAGS) -o continuity-window src/gui/continuity_window.c $(shell pkg-config --cflags --libs gtk4)
+
+demo-gui: continuity-window
+	./continuity-window
 
 loogal-window: src/gui/loogal_window.c include/gui/loogal_window.h loogal
 	$(CC) $(CFLAGS) -Iinclude -o loogal-window src/gui/loogal_window.c $$(pkg-config --cflags --libs gtk4)
