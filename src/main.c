@@ -24,6 +24,7 @@
 #include "cobj.h"
 #include "rel.h"
 #include "manifest_cmd.h"
+#include "shard_index.h"
 #include "loogal/watch_config.h"
 #include "loogal/watch_run.h"
 #include "loogal/watch_event.h"
@@ -44,6 +45,8 @@ static Cmd commands[] = {
     {"search", "search whole-image manifestations", cmd_search},
     {"trace", "trace a known manifestation", cmd_trace},
     {"region-search", "search from a crop or partial visual region", cmd_region_search},
+    {"shard-index", "build fast crop-inside-image shard index", cmd_shard_index},
+    {"shard-find", "find indexed parent images for a crop shard", cmd_shard_find},
     {"zone", "create/import bounded memory zones", cmd_zone},
     {"checkpoint", "create/save/commit edit sessions", cmd_checkpoint},
     {"zsig", "create deterministic zone signatures", cmd_zsig},
