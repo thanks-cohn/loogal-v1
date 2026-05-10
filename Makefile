@@ -2,7 +2,7 @@ CC ?= gcc
 CFLAGS ?= -O3 -Wall -Wextra -std=c11 -Iinclude
 LDFLAGS ?=
 LDLIBS ?= -lm
-SRC := $(wildcard src/*.c) $(wildcard src/core/*.c)
+SRC := $(filter-out src/win_action_stub.c src/shard_tool.c,$(wildcard src/*.c)) $(wildcard src/core/*.c)
 OBJ := $(SRC:.c=.o)
 BIN := loogal
 
@@ -12,7 +12,7 @@ $(BIN): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS) $(LDLIBS)
 
 clean:
-	rm -f src/*.o src/core/*.o $(BIN) continuity-window loogal-window loogal-gallery-window
+	rm -f src/*.o src/core/*.o $(BIN) locus-shard continuity-window loogal-window loogal-gallery-window
 
 safe-clean: clean
 	@echo "Preserving data/, logs/, manifests/"
@@ -20,7 +20,10 @@ safe-clean: clean
 test: $(BIN)
 	bash tests/smoke.sh
 
-.PHONY: all clean safe-clean test
+.PHONY: all clean safe-clean test locus-shard
+
+locus-shard: $(filter-out src/main.o src/win_action_stub.o,$(OBJ)) src/shard_tool.o
+	$(CC) $(CFLAGS) -o locus-shard $(filter-out src/main.o src/win_action_stub.o,$(OBJ)) src/shard_tool.o $(LDFLAGS) $(LDLIBS)
 
 test-search-json: $(BIN)
 	bash tests/test_search_json_build.sh
