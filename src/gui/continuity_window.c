@@ -1,4 +1,9 @@
 #include <gtk/gtk.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_RESULTS 24
 
 static GtkWidget *preview;
 static GtkWidget *hero;
@@ -8,57 +13,128 @@ static GtkWidget *lightbox_title;
 static GtkWidget *lightbox_image;
 static GtkWidget *lightbox_caption;
 static int lightbox_index = 0;
+static int result_count = 0;
+static char result_paths[MAX_RESULTS][2048];
+static char result_scores[MAX_RESULTS][64];
 
-static const char *demo_titles[] = {
-    "Recovered original manifestation",
-    "Region witness",
-    "Polygon continuity",
-    "Possible derivative",
-    "Related screenshot lineage"
-};
+static void shell_quote(const char *in, char *out, size_t out_sz) {
+    size_t j = 0;
+    if (j < out_sz) out[j++] = '\'';
+    for (size_t i = 0; in[i] && j + 5 < out_sz; i++) {
+        if (in[i] == '\'') {
+            out[j++] = '\'';
+            out[j++] = '\\';
+            out[j++] = '\'';
+            out[j++] = '\'';
+        } else {
+            out[j++] = in[i];
+        }
+    }
+    if (j < out_sz) out[j++] = '\'';
+    if (j < out_sz) out[j] = 0;
+    else out[out_sz - 1] = 0;
+}
 
-static const char *demo_meta[] = {
-    "same visual identity · likely source image",
-    "matched bounded fragment · crop survives context",
-    "shape-aware relation · partial object match",
-    "renamed/exported/screenshot lineage candidate",
-    "nearby memory branch · same visual family"
-};
+static void json_get_string(const char *line, const char *key, char *out, size_t out_sz) {
+    char pat[128];
+    snprintf(pat, sizeof(pat), "\"%s\"", key);
+    const char *p = strstr(line, pat);
+    if (!p) return;
+    p = strchr(p, ':');
+    if (!p) return;
+    p = strchr(p, '"');
+    if (!p) return;
+    p++;
+    size_t j = 0;
+    while (*p && *p != '"' && j + 1 < out_sz) {
+        if (*p == '\\' && p[1]) p++;
+        out[j++] = *p++;
+    }
+    out[j] = 0;
+}
 
-static const char *demo_scores[] = {
-    "98.2%",
-    "94.4%",
-    "91.8%",
-    "87.6%",
-    "82.3%"
-};
+static void json_get_number(const char *line, const char *key, char *out, size_t out_sz) {
+    char pat[128];
+    snprintf(pat, sizeof(pat), "\"%s\"", key);
+    const char *p = strstr(line, pat);
+    if (!p) return;
+    p = strchr(p, ':');
+    if (!p) return;
+    p++;
+    while (*p == ' ') p++;
+    snprintf(out, out_sz, "%.1f%%", atof(p));
+}
+
+static int run_region_search(const char *query_path) {
+    char quoted[4096];
+    char cmd[8192];
+    shell_quote(query_path, quoted, sizeof(quoted));
+    snprintf(cmd, sizeof(cmd), "./loogal region-search %s --memory --json --limit 24 --min 40", quoted);
+
+    FILE *pipe = popen(cmd, "r");
+    if (!pipe) return 0;
+
+    char line[16384];
+    int in_result = 0;
+    result_count = 0;
+    memset(result_paths, 0, sizeof(result_paths));
+    memset(result_scores, 0, sizeof(result_scores));
+
+    while (fgets(line, sizeof(line), pipe)) {
+        if (strstr(line, "\"rank\"")) in_result = 1;
+        if (!in_result) continue;
+        if (strstr(line, "\"path\"")) {
+            json_get_string(line, "path", result_paths[result_count], sizeof(result_paths[result_count]));
+        }
+        if (strstr(line, "\"score_percent\"")) {
+            json_get_number(line, "score_percent", result_scores[result_count], sizeof(result_scores[result_count]));
+        }
+        if (strstr(line, "}\") || strstr(line, "    }")) {
+            if (result_paths[result_count][0]) {
+                if (!result_scores[result_count][0]) snprintf(result_scores[result_count], sizeof(result_scores[result_count]), "match");
+                result_count++;
+                if (result_count >= MAX_RESULTS) break;
+            }
+            in_result = 0;
+        }
+    }
+
+    pclose(pipe);
+    return result_count;
+}
 
 static void update_lightbox(void) {
+    if (result_count <= 0) return;
     char title[512];
-    char caption[1024];
+    char caption[4096];
+    const char *path = result_paths[lightbox_index];
+    const char *base = strrchr(path, '/');
+    base = base ? base + 1 : path;
 
-    snprintf(title, sizeof(title), "%s", demo_titles[lightbox_index]);
+    snprintf(title, sizeof(title), "%s", base);
     snprintf(caption, sizeof(caption),
-             "%s\ncontinuity score: %s\nnode %d of 5",
-             demo_meta[lightbox_index],
-             demo_scores[lightbox_index],
-             lightbox_index + 1);
+             "continuity score: %s\nnode %d of %d\n%s",
+             result_scores[lightbox_index],
+             lightbox_index + 1,
+             result_count,
+             path);
 
     gtk_label_set_text(GTK_LABEL(lightbox_title), title);
     gtk_label_set_text(GTK_LABEL(lightbox_caption), caption);
+    gtk_picture_set_filename(GTK_PICTURE(lightbox_image), path);
 }
 
 static void lightbox_next(GtkButton *button, gpointer data) {
-    (void)button;
-    (void)data;
-    lightbox_index = (lightbox_index + 1) % 5;
+    (void)button; (void)data;
+    if (result_count <= 0) return;
+    lightbox_index = (lightbox_index + 1) % result_count;
     update_lightbox();
 }
 
 static void lightbox_prev(GtkButton *button, gpointer data) {
-    (void)button;
-    (void)data;
-    lightbox_index = (lightbox_index + 4) % 5;
+    (void)button; (void)data;
+    if (result_count <= 0) return;
+    lightbox_index = (lightbox_index + result_count - 1) % result_count;
     update_lightbox();
 }
 
@@ -70,8 +146,7 @@ static void open_lightbox(GtkButton *button, gpointer data) {
 }
 
 static void close_lightbox(GtkButton *button, gpointer data) {
-    (void)button;
-    (void)data;
+    (void)button; (void)data;
     gtk_widget_set_visible(lightbox, FALSE);
 }
 
@@ -84,7 +159,7 @@ static void clear_cards(void) {
     }
 }
 
-static GtkWidget *make_card(const char *title, const char *meta, const char *score, int index) {
+static GtkWidget *make_card(const char *path, const char *score, int index) {
     GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     gtk_widget_add_css_class(row, "card");
     gtk_widget_set_margin_top(row, 6);
@@ -92,13 +167,18 @@ static GtkWidget *make_card(const char *title, const char *meta, const char *sco
     gtk_widget_set_margin_start(row, 10);
     gtk_widget_set_margin_end(row, 10);
 
-    GtkWidget *thumb = gtk_label_new("◉");
-    gtk_widget_add_css_class(thumb, "thumb-dot");
-    gtk_widget_set_size_request(thumb, 64, 64);
+    GtkWidget *thumb = gtk_picture_new_for_filename(path);
+    gtk_picture_set_content_fit(GTK_PICTURE(thumb), GTK_CONTENT_FIT_COVER);
+    gtk_widget_set_size_request(thumb, 74, 74);
+
+    const char *base = strrchr(path, '/');
+    base = base ? base + 1 : path;
 
     GtkWidget *text = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
-    GtkWidget *name = gtk_label_new(title);
-    GtkWidget *sub = gtk_label_new(meta);
+    GtkWidget *name = gtk_label_new(base);
+    GtkWidget *sub = gtk_label_new(path);
+    gtk_label_set_ellipsize(GTK_LABEL(name), PANGO_ELLIPSIZE_END);
+    gtk_label_set_ellipsize(GTK_LABEL(sub), PANGO_ELLIPSIZE_MIDDLE);
     gtk_label_set_xalign(GTK_LABEL(name), 0.0f);
     gtk_label_set_xalign(GTK_LABEL(sub), 0.0f);
     gtk_widget_add_css_class(name, "result-title");
@@ -121,18 +201,21 @@ static GtkWidget *make_card(const char *title, const char *meta, const char *sco
     return row;
 }
 
-static void add_demo_cards(void) {
+static void show_results(void) {
     clear_cards();
-    for (int i = 0; i < 5; i++) {
-        gtk_box_append(GTK_BOX(cards), make_card(demo_titles[i], demo_meta[i], demo_scores[i], i));
+    if (result_count <= 0) {
+        GtkWidget *row = gtk_label_new("No indexed shard matches yet. Run: ./loogal index <your-image-folder>");
+        gtk_widget_add_css_class(row, "muted");
+        gtk_box_append(GTK_BOX(cards), row);
+        return;
+    }
+    for (int i = 0; i < result_count; i++) {
+        gtk_box_append(GTK_BOX(cards), make_card(result_paths[i], result_scores[i], i));
     }
 }
 
 static gboolean on_drop(GtkDropTarget *target, const GValue *value, double x, double y, gpointer data) {
-    (void)target;
-    (void)x;
-    (void)y;
-    (void)data;
+    (void)target; (void)x; (void)y; (void)data;
 
     GFile *file = g_value_get_object(value);
     if (!file) return FALSE;
@@ -140,10 +223,13 @@ static gboolean on_drop(GtkDropTarget *target, const GValue *value, double x, do
     char *path = g_file_get_path(file);
     if (!path) return FALSE;
 
-    gtk_label_set_text(GTK_LABEL(hero), "The computer remembered.");
+    gtk_label_set_text(GTK_LABEL(hero), "Searching memory for this shard…");
     gtk_picture_set_filename(GTK_PICTURE(preview), path);
-    gtk_picture_set_filename(GTK_PICTURE(lightbox_image), path);
-    add_demo_cards();
+
+    int hits = run_region_search(path);
+    if (hits > 0) gtk_label_set_text(GTK_LABEL(hero), "The computer remembered.");
+    else gtk_label_set_text(GTK_LABEL(hero), "No shard matches yet. Index a folder, then drop again.");
+    show_results();
 
     g_free(path);
     return TRUE;
@@ -159,11 +245,9 @@ static void load_css(void) {
         ".card { background: #18181b; border-radius: 14px; padding: 12px; }"
         ".result-title { color: #fafafa; font-size: 16px; font-weight: 700; }"
         ".score { color: #a7f3d0; font-size: 18px; font-weight: 800; }"
-        ".thumb-dot { color: #38bdf8; font-size: 34px; }"
         ".lightbox { background: #09090b; border-radius: 22px; padding: 18px; }"
         ".lightbox-title { color: #fafafa; font-size: 24px; font-weight: 900; }"
     );
-
     gtk_style_context_add_provider_for_display(gdk_display_get_default(), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     g_object_unref(provider);
 }
@@ -195,7 +279,7 @@ static GtkWidget *build_lightbox(void) {
     gtk_box_append(GTK_BOX(nav), prev);
     gtk_box_append(GTK_BOX(nav), next);
 
-    lightbox_caption = gtk_label_new("Traverse continuity results.");
+    lightbox_caption = gtk_label_new("Traverse real indexed matches.");
     gtk_widget_add_css_class(lightbox_caption, "muted");
     gtk_label_set_xalign(GTK_LABEL(lightbox_caption), 0.0f);
 
@@ -221,7 +305,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_set_margin_end(root, 18);
     gtk_window_set_child(GTK_WINDOW(window), root);
 
-    hero = gtk_label_new("Drop a fragment. Recover its world.");
+    hero = gtk_label_new("Drop a shard. Recover where it lives.");
     gtk_widget_add_css_class(hero, "hero");
     gtk_label_set_xalign(GTK_LABEL(hero), 0.0f);
     gtk_box_append(GTK_BOX(root), hero);
@@ -241,7 +325,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_set_vexpand(preview, TRUE);
     gtk_box_append(GTK_BOX(left), preview);
 
-    GtkWidget *hint = gtk_label_new("Drag an image here. Locus will stage continuity candidates.");
+    GtkWidget *hint = gtk_label_new("First run ./loogal index <folder>. Then drag a shard here.");
     gtk_widget_add_css_class(hint, "muted");
     gtk_box_append(GTK_BOX(left), hint);
 
@@ -250,12 +334,14 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_add_controller(left, GTK_EVENT_CONTROLLER(target));
 
     GtkWidget *right = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-    gtk_widget_set_size_request(right, 480, -1);
+    gtk_widget_set_size_request(right, 520, -1);
     gtk_box_append(GTK_BOX(body), right);
 
     cards = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
     gtk_box_append(GTK_BOX(right), cards);
-    gtk_box_append(GTK_BOX(cards), make_card("Awaiting fragment", "drop image to begin continuity recall", "—", 0));
+    GtkWidget *await = gtk_label_new("Awaiting shard. Real indexed matches will appear here.");
+    gtk_widget_add_css_class(await, "muted");
+    gtk_box_append(GTK_BOX(cards), await);
 
     lightbox = build_lightbox();
     gtk_box_append(GTK_BOX(right), lightbox);
