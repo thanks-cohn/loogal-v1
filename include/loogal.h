@@ -68,6 +68,7 @@ int image_probe_v0(const char *path, LoogalImageInfo *out);
 int image_is_supported(const char *path);
 int compute_dhash(const char *path, uint64_t *out_hash);
 int compute_ahash(const char *path, uint64_t *out_hash);
+int compute_region_hashes(const char *path, int x, int y, int w, int h, uint64_t *out_dhash, uint64_t *out_ahash);
 int write_index_records(LoogalRecord *records, size_t count);
 int read_index_records(LoogalRecord **records, size_t *count);
 int hamming64(uint64_t a, uint64_t b);
