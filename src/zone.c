@@ -14,6 +14,7 @@ typedef struct { const char *key; const char *value; } ZoneField;
 static void usage(void) {
     puts("ZONE MEMORY");
     puts("loogal zone add <image> --box x,y,w,h --name <label>");
+    puts("  [--category root/branch/leaf|dataset/train/class-a]");
     puts("  [--tags a,b,c] [--clusters x,y,z] [--family name]");
     puts("  [--parent id-or-name] [--child id-or-name]");
     puts("  [--kind person|specimen|artifact|region|custom]");
@@ -60,9 +61,9 @@ static void fields_json(FILE *f, ZoneField *fields, int n) {
 
 static int write_zone_record(FILE *f, const char *record_type, const char *schema,
     unsigned long long zone_id, const char *image, const char *box, const char *name,
-    const char *kind, const char *description, const char *tags, const char *clusters,
-    const char *family, const char *parent, const char *child, const char *confidence,
-    ZoneField *fields, int field_count)
+    const char *kind, const char *description, const char *category, const char *tags,
+    const char *clusters, const char *family, const char *parent, const char *child,
+    const char *confidence, ZoneField *fields, int field_count)
 {
     fputc('{', f);
     js(f, "type", record_type, 1);
@@ -75,6 +76,7 @@ static int write_zone_record(FILE *f, const char *record_type, const char *schem
     js(f, "name", name, 1);
     js(f, "kind", kind ? kind : "region", 1);
     js(f, "description", description ? description : "", 1);
+    js(f, "category", category ? category : "", 1);
     js(f, "tags", tags ? tags : "", 1);
     js(f, "clusters", clusters ? clusters : "", 1);
     js(f, "family", family ? family : "", 1);
@@ -95,6 +97,7 @@ int cmd_zone(int argc, char **argv) {
     const char *image = argv[1];
     const char *box = arg_value(argc, argv, "--box");
     const char *name = arg_value(argc, argv, "--name");
+    const char *category = arg_value(argc, argv, "--category");
     const char *tags = arg_value(argc, argv, "--tags");
     const char *clusters = arg_value(argc, argv, "--clusters");
     const char *family = arg_value(argc, argv, "--family");
@@ -112,13 +115,13 @@ int cmd_zone(int argc, char **argv) {
     FILE *state = fopen(LOOGAL_ZONES_PATH, "a");
     if (!state) { loogal_die("zone", "could not open zones database"); return 1; }
     write_zone_record(state, "zone.annotation", "locus.zone:v1", zone_id, image, box, name, kind,
-        description, tags, clusters, family, parent, child, confidence, fields, field_count);
+        description, category, tags, clusters, family, parent, child, confidence, fields, field_count);
     fclose(state);
 
     FILE *events = fopen(LOOGAL_EVENTS_PATH, "a");
     if (events) {
         write_zone_record(events, "zone.created", "locus.event.zone:v1", zone_id, image, box, name, kind,
-            description, tags, clusters, family, parent, child, confidence, fields, field_count);
+            description, category, tags, clusters, family, parent, child, confidence, fields, field_count);
         fclose(events);
     } else {
         loogal_log("zone.event", "error", "could not append zone.created event");
@@ -132,6 +135,7 @@ int cmd_zone(int argc, char **argv) {
     printf("bbox:        %s\n", box);
     printf("name:        %s\n", name);
     printf("kind:        %s\n", kind ? kind : "region");
+    if (category && *category) printf("category:    %s\n", category);
     if (tags && *tags) printf("tags:        %s\n", tags);
     if (clusters && *clusters) printf("clusters:    %s\n", clusters);
     if (family && *family) printf("family:      %s\n", family);
