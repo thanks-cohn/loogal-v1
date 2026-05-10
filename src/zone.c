@@ -19,6 +19,9 @@ static void usage(void) {
     puts("  [--parent id-or-name] [--child id-or-name]");
     puts("  [--kind person|specimen|artifact|region|custom]");
     puts("  [--description text] [--confidence n] [--field key=value]");
+    puts("");
+    puts("loogal zone import <file.csv> --format csv [--category path]");
+    puts("  CSV columns: image,bbox,name,kind,category,tags,clusters,family,parent,child");
 }
 
 static const char *arg_value(int argc, char **argv, const char *flag) {
@@ -63,7 +66,7 @@ static int write_zone_record(FILE *f, const char *record_type, const char *schem
     unsigned long long zone_id, const char *image, const char *box, const char *name,
     const char *kind, const char *description, const char *category, const char *tags,
     const char *clusters, const char *family, const char *parent, const char *child,
-    const char *confidence, ZoneField *fields, int field_count)
+    const char *confidence, const char *source, ZoneField *fields, int field_count)
 {
     fputc('{', f);
     js(f, "type", record_type, 1);
@@ -83,15 +86,94 @@ static int write_zone_record(FILE *f, const char *record_type, const char *schem
     js(f, "parent", parent ? parent : "", 1);
     js(f, "child", child ? child : "", 1);
     js(f, "confidence", confidence ? confidence : "1.0", 1);
-    js(f, "source", "manual", 1);
+    js(f, "source", source ? source : "manual", 1);
     fields_json(f, fields, field_count);
     fputs("}\n", f);
     return 0;
 }
 
+static int append_zone_pair(unsigned long long zone_id, const char *image, const char *box, const char *name,
+    const char *kind, const char *description, const char *category, const char *tags, const char *clusters,
+    const char *family, const char *parent, const char *child, const char *confidence, const char *source,
+    ZoneField *fields, int field_count)
+{
+    FILE *state = fopen(LOOGAL_ZONES_PATH, "a");
+    if (!state) return 1;
+    write_zone_record(state, "zone.annotation", "locus.zone:v1", zone_id, image, box, name, kind,
+        description, category, tags, clusters, family, parent, child, confidence, source, fields, field_count);
+    fclose(state);
+
+    FILE *events = fopen(LOOGAL_EVENTS_PATH, "a");
+    if (events) {
+        write_zone_record(events, "zone.imported", "locus.event.zone:v1", zone_id, image, box, name, kind,
+            description, category, tags, clusters, family, parent, child, confidence, source, fields, field_count);
+        fclose(events);
+    } else {
+        loogal_log("zone.event", "error", "could not append zone event");
+    }
+    return 0;
+}
+
+static void trim_newline(char *s) {
+    if (!s) return;
+    for (char *p = s; *p; p++) if (*p == '\n' || *p == '\r') { *p = '\0'; return; }
+}
+
+static int zone_import_csv(const char *path, const char *override_category) {
+    FILE *in = fopen(path, "r");
+    if (!in) { loogal_die("zone.import", "could not open import file"); return 1; }
+
+    char line[8192];
+    long imported = 0;
+    long skipped = 0;
+
+    while (fgets(line, sizeof(line), in)) {
+        trim_newline(line);
+        if (!line[0] || line[0] == '#') continue;
+        if (strncmp(line, "image,", 6) == 0) continue;
+
+        char *cols[10] = {0};
+        char *save = NULL;
+        char *tok = strtok_r(line, ",", &save);
+        int n = 0;
+        while (tok && n < 10) { cols[n++] = tok; tok = strtok_r(NULL, ",", &save); }
+        if (n < 3 || !cols[0][0] || !cols[1][0] || !cols[2][0]) { skipped++; continue; }
+
+        ZoneField fields[2];
+        fields[0].key = "import.format"; fields[0].value = "csv";
+        fields[1].key = "edit.status"; fields[1].value = "imported-editable";
+        unsigned long long zone_id = (unsigned long long)now_unix() + (unsigned long long)imported;
+        append_zone_pair(zone_id, cols[0], cols[1], cols[2], n > 3 ? cols[3] : "region", "",
+            override_category ? override_category : (n > 4 ? cols[4] : ""),
+            n > 5 ? cols[5] : "", n > 6 ? cols[6] : "", n > 7 ? cols[7] : "",
+            n > 8 ? cols[8] : "", n > 9 ? cols[9] : "", "1.0", "import", fields, 2);
+        imported++;
+    }
+
+    fclose(in);
+    printf("ZONES IMPORTED\n");
+    printf("file:     %s\n", path);
+    printf("imported: %ld\n", imported);
+    printf("skipped:  %ld\n", skipped);
+    printf("state:    data/zones.jsonl\n");
+    printf("events:   data/events.jsonl\n");
+    loogal_log("zone.import", "ok", path);
+    return 0;
+}
+
 int cmd_zone(int argc, char **argv) {
     if (argc < 1) { usage(); return 1; }
-    if (strcmp(argv[0], "add") != 0) { loogal_die("zone", "only 'add' currently supported"); return 1; }
+
+    if (strcmp(argv[0], "import") == 0) {
+        if (argc < 2) { loogal_die("zone.import", "missing import file"); return 1; }
+        const char *format = arg_value(argc, argv, "--format");
+        const char *category = arg_value(argc, argv, "--category");
+        if (!format || strcmp(format, "csv") == 0) return zone_import_csv(argv[1], category);
+        loogal_die("zone.import", "unsupported format; use --format csv");
+        return 1;
+    }
+
+    if (strcmp(argv[0], "add") != 0) { loogal_die("zone", "supported: add, import"); return 1; }
     if (argc < 2) { loogal_die("zone", "missing image path"); return 1; }
 
     const char *image = argv[1];
@@ -112,19 +194,9 @@ int cmd_zone(int argc, char **argv) {
     if (!box || !name) { loogal_die("zone", "--box and --name are required"); return 1; }
 
     unsigned long long zone_id = (unsigned long long)now_unix();
-    FILE *state = fopen(LOOGAL_ZONES_PATH, "a");
-    if (!state) { loogal_die("zone", "could not open zones database"); return 1; }
-    write_zone_record(state, "zone.annotation", "locus.zone:v1", zone_id, image, box, name, kind,
-        description, category, tags, clusters, family, parent, child, confidence, fields, field_count);
-    fclose(state);
-
-    FILE *events = fopen(LOOGAL_EVENTS_PATH, "a");
-    if (events) {
-        write_zone_record(events, "zone.created", "locus.event.zone:v1", zone_id, image, box, name, kind,
-            description, category, tags, clusters, family, parent, child, confidence, fields, field_count);
-        fclose(events);
-    } else {
-        loogal_log("zone.event", "error", "could not append zone.created event");
+    if (append_zone_pair(zone_id, image, box, name, kind, description, category, tags, clusters,
+        family, parent, child, confidence, "manual", fields, field_count) != 0) {
+        loogal_die("zone", "could not open zones database"); return 1;
     }
 
     puts("ZONE REMEMBERED");
