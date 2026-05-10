@@ -17,6 +17,7 @@
 #include "window_api.h"
 #include "ingest.h"
 #include "trace.h"
+#include "region_search.h"
 #include "loogal/watch_config.h"
 #include "loogal/watch_run.h"
 #include "loogal/watch_event.h"
@@ -34,6 +35,7 @@ puts("  loogal ingest <path> [--all|--pdf|--comics|--images-only] --dry-run [--j
     puts("  loogal learn <directories...>");
     puts("  loogal search <image> [MIN_PERCENT]");
     puts("  loogal trace <path>");
+    puts("  loogal region-search <crop.png> [place]");
     puts("  loogal stats");
     puts("  loogal dedupe --keep N [--dry-run] [--move-removed DIR] [--protect DIR...]");
     puts("  loogal thumbnail <path|create|session|status>");
@@ -123,6 +125,11 @@ return finish_command(cmd, rc, start_ms);
 
     if (strcmp(cmd, "trace") == 0) {
         rc = cmd_trace(argc - 2, argv + 2);
+        return finish_command(cmd, rc, start_ms);
+    }
+
+    if (strcmp(cmd, "region-search") == 0) {
+        rc = cmd_region_search(argc - 2, argv + 2);
         return finish_command(cmd, rc, start_ms);
     }
 
