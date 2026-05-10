@@ -2,7 +2,7 @@ CC ?= gcc
 CFLAGS ?= -O3 -Wall -Wextra -std=c11 -Iinclude
 LDFLAGS ?=
 LDLIBS ?= -lm
-SRC := $(wildcard src/*.c) $(wildcard src/core/*.c)
+SRC := $(filter-out src/win_action_stub.c,$(wildcard src/*.c)) $(wildcard src/core/*.c)
 OBJ := $(SRC:.c=.o)
 BIN := loogal
 
