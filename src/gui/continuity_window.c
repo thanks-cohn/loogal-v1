@@ -83,13 +83,14 @@ static int run_region_search(const char *query_path) {
     while (fgets(line, sizeof(line), pipe)) {
         if (strstr(line, "\"rank\"")) in_result = 1;
         if (!in_result) continue;
+
         if (strstr(line, "\"path\"")) {
             json_get_string(line, "path", result_paths[result_count], sizeof(result_paths[result_count]));
         }
         if (strstr(line, "\"score_percent\"")) {
             json_get_number(line, "score_percent", result_scores[result_count], sizeof(result_scores[result_count]));
         }
-        if (strstr(line, "}\") || strstr(line, "    }")) {
+        if (strstr(line, "    }") || strstr(line, "    },")) {
             if (result_paths[result_count][0]) {
                 if (!result_scores[result_count][0]) snprintf(result_scores[result_count], sizeof(result_scores[result_count]), "match");
                 result_count++;
