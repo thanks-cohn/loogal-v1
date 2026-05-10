@@ -126,8 +126,8 @@ Example:
 ```text
 Desktop/
 └── LOCUS-windows/
-    ├── LOCUSWindow.exe
-    ├── LOCUS.exe
+    ├── locus-desktop.exe
+    ├── locus.exe
     └── ...
 ```
 
