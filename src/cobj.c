@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 static void usage(void) {
     puts("CONTINUITY OBJECTS");
