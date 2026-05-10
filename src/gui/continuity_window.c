@@ -3,6 +3,77 @@
 static GtkWidget *preview;
 static GtkWidget *hero;
 static GtkWidget *cards;
+static GtkWidget *lightbox;
+static GtkWidget *lightbox_title;
+static GtkWidget *lightbox_image;
+static GtkWidget *lightbox_caption;
+static int lightbox_index = 0;
+
+static const char *demo_titles[] = {
+    "Recovered original manifestation",
+    "Region witness",
+    "Polygon continuity",
+    "Possible derivative",
+    "Related screenshot lineage"
+};
+
+static const char *demo_meta[] = {
+    "same visual identity · likely source image",
+    "matched bounded fragment · crop survives context",
+    "shape-aware relation · partial object match",
+    "renamed/exported/screenshot lineage candidate",
+    "nearby memory branch · same visual family"
+};
+
+static const char *demo_scores[] = {
+    "98.2%",
+    "94.4%",
+    "91.8%",
+    "87.6%",
+    "82.3%"
+};
+
+static void update_lightbox(void) {
+    char title[512];
+    char caption[1024];
+
+    snprintf(title, sizeof(title), "%s", demo_titles[lightbox_index]);
+    snprintf(caption, sizeof(caption),
+             "%s\ncontinuity score: %s\nnode %d of 5",
+             demo_meta[lightbox_index],
+             demo_scores[lightbox_index],
+             lightbox_index + 1);
+
+    gtk_label_set_text(GTK_LABEL(lightbox_title), title);
+    gtk_label_set_text(GTK_LABEL(lightbox_caption), caption);
+}
+
+static void lightbox_next(GtkButton *button, gpointer data) {
+    (void)button;
+    (void)data;
+    lightbox_index = (lightbox_index + 1) % 5;
+    update_lightbox();
+}
+
+static void lightbox_prev(GtkButton *button, gpointer data) {
+    (void)button;
+    (void)data;
+    lightbox_index = (lightbox_index + 4) % 5;
+    update_lightbox();
+}
+
+static void open_lightbox(GtkButton *button, gpointer data) {
+    (void)button;
+    lightbox_index = GPOINTER_TO_INT(data);
+    update_lightbox();
+    gtk_widget_set_visible(lightbox, TRUE);
+}
+
+static void close_lightbox(GtkButton *button, gpointer data) {
+    (void)button;
+    (void)data;
+    gtk_widget_set_visible(lightbox, FALSE);
+}
 
 static void clear_cards(void) {
     GtkWidget *child = gtk_widget_get_first_child(cards);
@@ -13,7 +84,7 @@ static void clear_cards(void) {
     }
 }
 
-static GtkWidget *make_card(const char *title, const char *meta, const char *score) {
+static GtkWidget *make_card(const char *title, const char *meta, const char *score, int index) {
     GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     gtk_widget_add_css_class(row, "card");
     gtk_widget_set_margin_top(row, 6);
@@ -38,7 +109,8 @@ static GtkWidget *make_card(const char *title, const char *meta, const char *sco
     GtkWidget *score_label = gtk_label_new(score);
     gtk_widget_add_css_class(score_label, "score");
 
-    GtkWidget *button = gtk_button_new_with_label("Expand continuity");
+    GtkWidget *button = gtk_button_new_with_label("Open lightbox");
+    g_signal_connect(button, "clicked", G_CALLBACK(open_lightbox), GINT_TO_POINTER(index));
 
     gtk_box_append(GTK_BOX(row), thumb);
     gtk_box_append(GTK_BOX(row), text);
@@ -51,10 +123,9 @@ static GtkWidget *make_card(const char *title, const char *meta, const char *sco
 
 static void add_demo_cards(void) {
     clear_cards();
-    gtk_box_append(GTK_BOX(cards), make_card("Recovered original manifestation", "same visual identity · likely source image", "98.2%"));
-    gtk_box_append(GTK_BOX(cards), make_card("Region witness", "matched bounded fragment · crop survives context", "94.4%"));
-    gtk_box_append(GTK_BOX(cards), make_card("Polygon continuity", "shape-aware relation · partial object match", "91.8%"));
-    gtk_box_append(GTK_BOX(cards), make_card("Possible derivative", "renamed/exported/screenshot lineage candidate", "87.6%"));
+    for (int i = 0; i < 5; i++) {
+        gtk_box_append(GTK_BOX(cards), make_card(demo_titles[i], demo_meta[i], demo_scores[i], i));
+    }
 }
 
 static gboolean on_drop(GtkDropTarget *target, const GValue *value, double x, double y, gpointer data) {
@@ -71,6 +142,7 @@ static gboolean on_drop(GtkDropTarget *target, const GValue *value, double x, do
 
     gtk_label_set_text(GTK_LABEL(hero), "The computer remembered.");
     gtk_picture_set_filename(GTK_PICTURE(preview), path);
+    gtk_picture_set_filename(GTK_PICTURE(lightbox_image), path);
     add_demo_cards();
 
     g_free(path);
@@ -88,15 +160,50 @@ static void load_css(void) {
         ".result-title { color: #fafafa; font-size: 16px; font-weight: 700; }"
         ".score { color: #a7f3d0; font-size: 18px; font-weight: 800; }"
         ".thumb-dot { color: #38bdf8; font-size: 34px; }"
+        ".lightbox { background: #09090b; border-radius: 22px; padding: 18px; }"
+        ".lightbox-title { color: #fafafa; font-size: 24px; font-weight: 900; }"
     );
 
-    gtk_style_context_add_provider_for_display(
-        gdk_display_get_default(),
-        GTK_STYLE_PROVIDER(provider),
-        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION
-    );
-
+    gtk_style_context_add_provider_for_display(gdk_display_get_default(), GTK_STYLE_PROVIDER(provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     g_object_unref(provider);
+}
+
+static GtkWidget *build_lightbox(void) {
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    gtk_widget_add_css_class(box, "lightbox");
+    gtk_widget_set_visible(box, FALSE);
+
+    GtkWidget *top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    lightbox_title = gtk_label_new("Continuity lightbox");
+    gtk_widget_add_css_class(lightbox_title, "lightbox-title");
+    gtk_label_set_xalign(GTK_LABEL(lightbox_title), 0.0f);
+    gtk_widget_set_hexpand(lightbox_title, TRUE);
+    GtkWidget *close = gtk_button_new_with_label("Close");
+    g_signal_connect(close, "clicked", G_CALLBACK(close_lightbox), NULL);
+    gtk_box_append(GTK_BOX(top), lightbox_title);
+    gtk_box_append(GTK_BOX(top), close);
+
+    lightbox_image = gtk_picture_new();
+    gtk_picture_set_content_fit(GTK_PICTURE(lightbox_image), GTK_CONTENT_FIT_CONTAIN);
+    gtk_widget_set_size_request(lightbox_image, 560, 360);
+
+    GtkWidget *nav = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    GtkWidget *prev = gtk_button_new_with_label("← Previous");
+    GtkWidget *next = gtk_button_new_with_label("Next →");
+    g_signal_connect(prev, "clicked", G_CALLBACK(lightbox_prev), NULL);
+    g_signal_connect(next, "clicked", G_CALLBACK(lightbox_next), NULL);
+    gtk_box_append(GTK_BOX(nav), prev);
+    gtk_box_append(GTK_BOX(nav), next);
+
+    lightbox_caption = gtk_label_new("Traverse continuity results.");
+    gtk_widget_add_css_class(lightbox_caption, "muted");
+    gtk_label_set_xalign(GTK_LABEL(lightbox_caption), 0.0f);
+
+    gtk_box_append(GTK_BOX(box), top);
+    gtk_box_append(GTK_BOX(box), lightbox_image);
+    gtk_box_append(GTK_BOX(box), nav);
+    gtk_box_append(GTK_BOX(box), lightbox_caption);
+    return box;
 }
 
 static void activate(GtkApplication *app, gpointer user_data) {
@@ -105,7 +212,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
     GtkWidget *window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), "Locus Continuity Explorer");
-    gtk_window_set_default_size(GTK_WINDOW(window), 1120, 760);
+    gtk_window_set_default_size(GTK_WINDOW(window), 1180, 820);
 
     GtkWidget *root = gtk_box_new(GTK_ORIENTATION_VERTICAL, 14);
     gtk_widget_set_margin_top(root, 18);
@@ -142,11 +249,16 @@ static void activate(GtkApplication *app, gpointer user_data) {
     g_signal_connect(target, "drop", G_CALLBACK(on_drop), NULL);
     gtk_widget_add_controller(left, GTK_EVENT_CONTROLLER(target));
 
-    cards = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
-    gtk_widget_set_size_request(cards, 430, -1);
-    gtk_box_append(GTK_BOX(body), cards);
+    GtkWidget *right = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_widget_set_size_request(right, 480, -1);
+    gtk_box_append(GTK_BOX(body), right);
 
-    gtk_box_append(GTK_BOX(cards), make_card("Awaiting fragment", "drop image to begin continuity recall", "—"));
+    cards = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+    gtk_box_append(GTK_BOX(right), cards);
+    gtk_box_append(GTK_BOX(cards), make_card("Awaiting fragment", "drop image to begin continuity recall", "—", 0));
+
+    lightbox = build_lightbox();
+    gtk_box_append(GTK_BOX(right), lightbox);
 
     gtk_window_present(GTK_WINDOW(window));
 }
