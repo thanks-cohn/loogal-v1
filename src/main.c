@@ -16,6 +16,7 @@
 #include "similar.h"
 #include "window_api.h"
 #include "ingest.h"
+#include "trace.h"
 #include "loogal/watch_config.h"
 #include "loogal/watch_run.h"
 #include "loogal/watch_event.h"
@@ -32,6 +33,7 @@ static void usage(void) {
 puts("  loogal ingest <path> [--all|--pdf|--comics|--images-only] --dry-run [--json]");
     puts("  loogal learn <directories...>");
     puts("  loogal search <image> [MIN_PERCENT]");
+    puts("  loogal trace <path>");
     puts("  loogal stats");
     puts("  loogal dedupe --keep N [--dry-run] [--move-removed DIR] [--protect DIR...]");
     puts("  loogal thumbnail <path|create|session|status>");
@@ -116,6 +118,11 @@ return finish_command(cmd, rc, start_ms);
 
     if (strcmp(cmd, "search") == 0) {
         rc = cmd_search(argc - 2, argv + 2);
+        return finish_command(cmd, rc, start_ms);
+    }
+
+    if (strcmp(cmd, "trace") == 0) {
+        rc = cmd_trace(argc - 2, argv + 2);
         return finish_command(cmd, rc, start_ms);
     }
 
