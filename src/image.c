@@ -34,19 +34,23 @@ int image_is_supported(const char *path) {
            strcasecmp(e, "gif") == 0;
 }
 
-static unsigned char sample_box_average(
+static unsigned char sample_box_average_region(
     const unsigned char *gray,
     int width,
     int height,
+    int rx,
+    int ry,
+    int rw,
+    int rh,
     int tx,
     int ty,
     int out_w,
     int out_h
 ) {
-    int x0 = (tx * width) / out_w;
-    int x1 = ((tx + 1) * width) / out_w;
-    int y0 = (ty * height) / out_h;
-    int y1 = ((ty + 1) * height) / out_h;
+    int x0 = rx + (tx * rw) / out_w;
+    int x1 = rx + ((tx + 1) * rw) / out_w;
+    int y0 = ry + (ty * rh) / out_h;
+    int y1 = ry + ((ty + 1) * rh) / out_h;
 
     if (x1 <= x0) x1 = x0 + 1;
     if (y1 <= y0) y1 = y0 + 1;
@@ -73,22 +77,43 @@ static unsigned char sample_box_average(
     return (unsigned char)(sum / count);
 }
 
-static int make_dhash_from_gray(
+static unsigned char sample_box_average(
     const unsigned char *gray,
     int width,
     int height,
+    int tx,
+    int ty,
+    int out_w,
+    int out_h
+) {
+    return sample_box_average_region(gray, width, height, 0, 0, width, height, tx, ty, out_w, out_h);
+}
+
+static int make_dhash_from_gray_region(
+    const unsigned char *gray,
+    int width,
+    int height,
+    int rx,
+    int ry,
+    int rw,
+    int rh,
     uint64_t *out_hash
 ) {
     if (!gray || width <= 0 || height <= 0 || !out_hash) return -1;
+    if (rw <= 0 || rh <= 0) return -1;
 
     unsigned char small[LOOGAL_DHASH_W * LOOGAL_DHASH_H];
 
     for (int y = 0; y < LOOGAL_DHASH_H; y++) {
         for (int x = 0; x < LOOGAL_DHASH_W; x++) {
-            small[y * LOOGAL_DHASH_W + x] = sample_box_average(
+            small[y * LOOGAL_DHASH_W + x] = sample_box_average_region(
                 gray,
                 width,
                 height,
+                rx,
+                ry,
+                rw,
+                rh,
                 x,
                 y,
                 LOOGAL_DHASH_W,
@@ -116,24 +141,41 @@ static int make_dhash_from_gray(
     return 0;
 }
 
-
-static int make_ahash_from_gray(
+static int make_dhash_from_gray(
     const unsigned char *gray,
     int width,
     int height,
     uint64_t *out_hash
 ) {
+    return make_dhash_from_gray_region(gray, width, height, 0, 0, width, height, out_hash);
+}
+
+static int make_ahash_from_gray_region(
+    const unsigned char *gray,
+    int width,
+    int height,
+    int rx,
+    int ry,
+    int rw,
+    int rh,
+    uint64_t *out_hash
+) {
     if (!gray || width <= 0 || height <= 0 || !out_hash) return -1;
+    if (rw <= 0 || rh <= 0) return -1;
 
     unsigned char small[LOOGAL_AHASH_W * LOOGAL_AHASH_H];
     unsigned long sum = 0;
 
     for (int y = 0; y < LOOGAL_AHASH_H; y++) {
         for (int x = 0; x < LOOGAL_AHASH_W; x++) {
-            unsigned char v = sample_box_average(
+            unsigned char v = sample_box_average_region(
                 gray,
                 width,
                 height,
+                rx,
+                ry,
+                rw,
+                rh,
                 x,
                 y,
                 LOOGAL_AHASH_W,
@@ -158,6 +200,15 @@ static int make_ahash_from_gray(
 
     *out_hash = h;
     return 0;
+}
+
+static int make_ahash_from_gray(
+    const unsigned char *gray,
+    int width,
+    int height,
+    uint64_t *out_hash
+) {
+    return make_ahash_from_gray_region(gray, width, height, 0, 0, width, height, out_hash);
 }
 
 int compute_dhash(const char *path, uint64_t *out_hash) {
@@ -206,6 +257,48 @@ int compute_ahash(const char *path, uint64_t *out_hash) {
     return rc;
 }
 
+int compute_region_hashes(
+    const char *path,
+    int x,
+    int y,
+    int w,
+    int h,
+    uint64_t *out_dhash,
+    uint64_t *out_ahash
+) {
+    if (!path || !out_dhash || !out_ahash) return -1;
+    if (w <= 0 || h <= 0) return -1;
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+
+    unsigned char *gray = stbi_load(path, &width, &height, &channels, 1);
+
+    if (!gray) {
+        char msg[512];
+        snprintf(msg, sizeof(msg), "stb decode failed for region: %.340s", path);
+        loogal_log("image.region.decode", "error", msg);
+        return -1;
+    }
+
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x >= width || y >= height) {
+        stbi_image_free(gray);
+        return -1;
+    }
+    if (x + w > width) w = width - x;
+    if (y + h > height) h = height - y;
+
+    int rc1 = make_dhash_from_gray_region(gray, width, height, x, y, w, h, out_dhash);
+    int rc2 = make_ahash_from_gray_region(gray, width, height, x, y, w, h, out_ahash);
+
+    stbi_image_free(gray);
+
+    return (rc1 == 0 && rc2 == 0) ? 0 : -1;
+}
+
 int image_probe(const char *path, LoogalImageInfo *out) {
     if (!path || !out) return -1;
     if (!image_is_supported(path)) return -1;
@@ -248,12 +341,6 @@ out->mtime_unix = (uint64_t)st.st_mtime;
         return -1;
     }
 
-    /*
-       TODO:
-       This calls the native C SHA-256 helper.
-       The external image tooling dependency is gone from the image primitive.
-       Next steel plate: replace hash.c with native C SHA-256.
-    */
     if (loogal_sha256_file(path, out->sha256) != 0) {
         memset(out->sha256, 0, sizeof(out->sha256));
         loogal_log("hash.sha256", "warn", path);
