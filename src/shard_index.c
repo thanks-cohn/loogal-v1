@@ -9,6 +9,9 @@
 #define LOOGAL_SHARD_INDEX_PATH "data/shards.bin"
 #define LOOGAL_SHARD_MAP_PATH   "data/shards.paths"
 
+static const int SHARD_SCALES[] = {64, 96, 128, 192};
+static const int SHARD_SCALE_COUNT = 4;
+
 typedef struct {
     char magic[8];
     uint32_t version;
@@ -76,6 +79,74 @@ static int load_path_for_id(uint32_t wanted, char *out, size_t out_sz) {
     return 1;
 }
 
+static int emit_tile(FILE *out, uint32_t image_id, const char *path, int x, int y, int w, int h) {
+    uint64_t dhash = 0;
+    uint64_t ahash = 0;
+
+    if (compute_region_hashes(path, x, y, w, h, &dhash, &ahash) != 0) {
+        return 0;
+    }
+
+    ShardDiskTile t;
+    memset(&t, 0, sizeof(t));
+    t.dhash = dhash;
+    t.ahash = ahash;
+    t.image_id = image_id;
+    t.x = (uint32_t)x;
+    t.y = (uint32_t)y;
+    t.w = (uint32_t)w;
+    t.h = (uint32_t)h;
+
+    return fwrite(&t, sizeof(t), 1, out) == 1 ? 1 : 0;
+}
+
+static uint64_t emit_tiles_for_record(FILE *out, const LoogalRecord *rec, uint32_t image_id) {
+    if (!rec || rec->width <= 0 || rec->height <= 0 || !rec->path[0]) return 0;
+
+    uint64_t written = 0;
+
+    for (int si = 0; si < SHARD_SCALE_COUNT; si++) {
+        int tile = SHARD_SCALES[si];
+        int stride = tile / 2;
+        if (stride < 1) stride = 1;
+
+        if (rec->width < tile || rec->height < tile) continue;
+
+        for (int y = 0; y <= rec->height - tile; y += stride) {
+            for (int x = 0; x <= rec->width - tile; x += stride) {
+                written += (uint64_t)emit_tile(out, image_id, rec->path, x, y, tile, tile);
+            }
+        }
+
+        int right_x = rec->width - tile;
+        int bottom_y = rec->height - tile;
+
+        if (right_x > 0) {
+            for (int y = 0; y <= rec->height - tile; y += stride) {
+                written += (uint64_t)emit_tile(out, image_id, rec->path, right_x, y, tile, tile);
+            }
+        }
+
+        if (bottom_y > 0) {
+            for (int x = 0; x <= rec->width - tile; x += stride) {
+                written += (uint64_t)emit_tile(out, image_id, rec->path, x, bottom_y, tile, tile);
+            }
+        }
+
+        if (right_x > 0 && bottom_y > 0) {
+            written += (uint64_t)emit_tile(out, image_id, rec->path, right_x, bottom_y, tile, tile);
+        }
+    }
+
+    if (written == 0) {
+        int w = rec->width > 0 ? rec->width : LOOGAL_SHARD_TILE_SIZE;
+        int h = rec->height > 0 ? rec->height : LOOGAL_SHARD_TILE_SIZE;
+        written += (uint64_t)emit_tile(out, image_id, rec->path, 0, 0, w, h);
+    }
+
+    return written;
+}
+
 static int build_from_existing_index(void) {
     LoogalRecord *records = NULL;
     size_t record_count = 0;
@@ -103,42 +174,39 @@ static int build_from_existing_index(void) {
     LoogalShardHeader header;
     memset(&header, 0, sizeof(header));
     memcpy(header.magic, LOOGAL_SHARD_INDEX_MAGIC, 7);
-    header.version = 1;
+    header.version = 2;
     header.tile_size = LOOGAL_SHARD_TILE_SIZE;
     header.stride = LOOGAL_SHARD_STRIDE;
     header.tile_count = 0;
 
     fwrite(&header, sizeof(header), 1, out);
 
+    double start = loogal_now_ms();
+    uint64_t images_with_tiles = 0;
+
     for (size_t i = 0; i < record_count; i++) {
         write_path_map(map, (uint32_t)i, records[i].path);
-
-        /* v0 fast path: one whole-record tile per indexed image.
-           Next step replaces this with real overlapping decoded tiles. */
-        ShardDiskTile t;
-        memset(&t, 0, sizeof(t));
-        t.dhash = records[i].dhash;
-        t.ahash = records[i].ahash;
-        t.image_id = (uint32_t)i;
-        t.x = 0;
-        t.y = 0;
-        t.w = (uint32_t)(records[i].width > 0 ? records[i].width : 0);
-        t.h = (uint32_t)(records[i].height > 0 ? records[i].height : 0);
-        fwrite(&t, sizeof(t), 1, out);
-        header.tile_count++;
+        uint64_t n = emit_tiles_for_record(out, &records[i], (uint32_t)i);
+        header.tile_count += n;
+        if (n > 0) images_with_tiles++;
     }
 
     fseek(out, 0, SEEK_SET);
     fwrite(&header, sizeof(header), 1, out);
+
+    double elapsed = loogal_now_ms() - start;
 
     fclose(map);
     fclose(out);
     free(records);
 
     printf("SHARD INDEX BUILT\n");
+    printf("mode:     overlapping region witnesses\n");
+    printf("images:   %llu\n", (unsigned long long)images_with_tiles);
     printf("tiles:    %llu\n", (unsigned long long)header.tile_count);
-    printf("tile:     %u\n", header.tile_size);
-    printf("stride:   %u\n", header.stride);
+    printf("scales:   64,96,128,192\n");
+    printf("stride:   half tile size\n");
+    printf("time:     %.3f ms\n", elapsed);
     printf("index:    %s\n", LOOGAL_SHARD_INDEX_PATH);
     printf("paths:    %s\n", LOOGAL_SHARD_MAP_PATH);
 
@@ -154,7 +222,7 @@ int cmd_shard_index(int argc, char **argv) {
 
 int cmd_shard_find(int argc, char **argv) {
     if (argc < 1) {
-        loogal_die("shard-find", "usage: loogal shard-find <crop.png> [--limit N] [--min N]");
+        loogal_die("shard-find", "usage: locus-shard find <crop.png> [--limit N] [--min N]");
         return 1;
     }
 
@@ -177,7 +245,7 @@ int cmd_shard_find(int argc, char **argv) {
 
     FILE *f = fopen(LOOGAL_SHARD_INDEX_PATH, "rb");
     if (!f) {
-        loogal_die("shard-find", "missing shard index; run loogal shard-index after loogal index");
+        loogal_die("shard-find", "missing shard index; run locus-shard index after loogal index");
         return 1;
     }
 
@@ -197,10 +265,17 @@ int cmd_shard_find(int argc, char **argv) {
 
     double start = loogal_now_ms();
     int kept = 0;
+    int skipped_self = 0;
 
     for (uint64_t i = 0; i < header.tile_count; i++) {
         ShardDiskTile t;
+        char path[4096] = {0};
         if (fread(&t, sizeof(t), 1, f) != 1) break;
+        load_path_for_id(t.image_id, path, sizeof(path));
+        if (path[0] && strcmp(path, query_path) == 0) {
+            skipped_self++;
+            continue;
+        }
 
         int dd = hamming64(query.dhash, t.dhash);
         int ad = hamming64(query.ahash, t.ahash);
@@ -227,10 +302,11 @@ int cmd_shard_find(int argc, char **argv) {
 
     puts("SHARD FIND");
     puts("==============================");
-    printf("query:    %s\n", query_path);
-    printf("tiles:    %llu\n", (unsigned long long)header.tile_count);
-    printf("returned: %d\n", kept);
-    printf("time:     %.3f ms\n\n", elapsed);
+    printf("query:        %s\n", query_path);
+    printf("tiles:        %llu\n", (unsigned long long)header.tile_count);
+    printf("returned:     %d\n", kept);
+    printf("skipped_self: %d\n", skipped_self);
+    printf("time:         %.3f ms\n\n", elapsed);
 
     for (int i = 0; i < kept; i++) {
         char path[4096] = {0};
