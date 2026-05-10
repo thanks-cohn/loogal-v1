@@ -2,7 +2,6 @@
 #include "hash_v0.h"
 #include "hash_native.h"
 #include "timer.h"
-#include "jsonout.h"
 #include "config.h"
 #include "why.h"
 #include "verify.h"
@@ -22,6 +21,8 @@
 #include "checkpoint.h"
 #include "zsig.h"
 #include "zone_search.h"
+#include "cobj.h"
+#include "rel.h"
 #include "loogal/watch_config.h"
 #include "loogal/watch_run.h"
 #include "loogal/watch_event.h"
@@ -30,63 +31,71 @@
 
 int loogal_doctor(void);
 
+typedef int (*CmdFn)(int argc, char **argv);
+typedef struct { const char *name; const char *help; CmdFn fn; } Cmd;
+
+static int wrap_doctor(int argc, char **argv) { (void)argc; (void)argv; return loogal_doctor(); }
+
+static Cmd commands[] = {
+    {"index", "index directories into binary visual memory", cmd_index},
+    {"ingest", "ingest images and container sources", cmd_ingest},
+    {"learn", "learn durable continuity observations", cmd_learn},
+    {"search", "search whole-image manifestations", cmd_search},
+    {"trace", "trace a known manifestation", cmd_trace},
+    {"region-search", "search from a crop or partial visual region", cmd_region_search},
+    {"zone", "create/import bounded memory zones", cmd_zone},
+    {"checkpoint", "create/save/commit edit sessions", cmd_checkpoint},
+    {"zsig", "create deterministic zone signatures", cmd_zsig},
+    {"zone-search", "retrieve zone signature records", cmd_zone_search},
+    {"cobj", "create/trace portable continuity objects", cmd_cobj},
+    {"rel", "add/trace continuity graph relationships", cmd_rel},
+    {"thumbnail", "create and inspect thumbnails", cmd_thumbnail},
+    {"stats", "show memory corpus stats", cmd_stats},
+    {"status", "show memory corpus status", cmd_stats},
+    {"dedupe", "deduplicate related manifestations", cmd_dedupe},
+    {"action", "open/reveal/copy paths", cmd_action},
+    {"session", "create search sessions", cmd_session},
+    {"history", "append session history", cmd_history},
+    {"similar", "find related manifestations", cmd_similar},
+    {"window-api", "serve GUI-friendly session pages", cmd_window_api},
+    {"doctor", "diagnose environment and storage", wrap_doctor},
+    {"config", "show configuration", cmd_config},
+    {"why", "explain match evidence", cmd_why},
+    {"verify", "verify durable state", cmd_verify},
+    {"bench", "benchmark memory search", cmd_bench},
+    {"rebuild", "rebuild hot indices", cmd_rebuild},
+    {"where", "show storage locations", cmd_where},
+    {"hash-v0", "compute legacy hash", cmd_hash_v0},
+    {"hash-v0-grid", "compute legacy grid hash", cmd_hash_v0_grid},
+    {"hash-compare", "compare hashes", cmd_hash_compare},
+    {"hash-native", "compute native hash", cmd_hash_native},
+    {"hash-native-grid", "compute native grid hash", cmd_hash_native_grid},
+    {0,0,0}
+};
+
 static void usage(void) {
-    puts("LOOGAL V1 — Local Visual Memory Engine");
+    puts("LOOGAL V1 — Continuity Memory Engine");
     puts("");
     puts("Commands:");
-    puts("  loogal index <directories...>");
-puts("  loogal ingest <path> [--all|--pdf|--comics|--images-only] --dry-run [--json]");
-    puts("  loogal learn <directories...>");
-    puts("  loogal search <image> [MIN_PERCENT]");
-    puts("  loogal trace <path>");
-    puts("  loogal region-search <crop.png> [place]");
-    puts("  loogal zone add <image> --box x,y,w,h --name <label>");
-    puts("  loogal checkpoint create|save|commit ...");
-    puts("  loogal zsig <image> --box x,y,w,h");
-    puts("  loogal zone-search <signature>");
-    puts("  loogal stats");
-    puts("  loogal dedupe --keep N [--dry-run] [--move-removed DIR] [--protect DIR...]");
-    puts("  loogal thumbnail <path|create|session|status>");
-    puts("  loogal action reveal --path <file>");
-    puts("  loogal action open --path <file>");
-    puts("  loogal action copy-path --path <file>");
-    puts("  loogal session create --query <image> --place <dir> [--json]");
-    puts("  loogal history push --query <image> --session <id>");
-    puts("  loogal similar --path <image> --place <dir> [--json]");
-    puts("  loogal window-api page --session <id> [--json]");
-    puts("  loogal doctor");
-    puts("  loogal config");
-    puts("  loogal why <path>");
-    puts("  loogal verify");
-    puts("  loogal bench");
-    puts("  loogal rebuild <directories...>");
-    puts("  loogal where");
-    puts("  loogal status");
-puts("  loogal watch-list");
-puts("  loogal watch-add <path> --daily HH:MM | --hourly | --weekly day HH:MM | --yearly MM-DD HH:MM");
-puts("  loogal watch-run [--dry-run|--all]");
+    for (int i = 0; commands[i].name; i++) {
+        printf("  loogal %-14s %s\n", commands[i].name, commands[i].help);
+    }
+    puts("  loogal watch-add/list/run/remove/enable/disable ... scheduled memory");
 }
 
 static int finish_command(const char *cmd, int rc, double start_ms) {
     double elapsed = loogal_now_ms() - start_ms;
-
     char msg[256];
-    snprintf(msg, sizeof(msg), "command=%s rc=%d duration_ms=%.3f",
-             cmd ? cmd : "unknown", rc, elapsed);
-
+    snprintf(msg, sizeof(msg), "command=%s rc=%d duration_ms=%.3f", cmd ? cmd : "unknown", rc, elapsed);
     loogal_log("command", rc == 0 ? "ok" : "error", msg);
     return rc;
 }
 
 int main(int argc, char **argv) {
     ensure_dirs();
-
     double start_ms = loogal_now_ms();
 
-    if (argc < 2) {
-        usage();
-        return finish_command("usage", 1, start_ms);
-    }
+    if (argc < 2) { usage(); return finish_command("usage", 1, start_ms); }
 
     const char *cmd = argv[1];
 
@@ -97,148 +106,14 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "watch-remove")) return loogal_cmd_watch_remove(argc, argv);
     if (!strcmp(cmd, "watch-enable")) return loogal_cmd_watch_enable(argc, argv);
     if (!strcmp(cmd, "watch-disable")) return loogal_cmd_watch_disable(argc, argv);
+    if (!strcmp(cmd, "bench-scan")) return cmd_bench_scan(argc, argv);
+    if (!strcmp(cmd, "help") || !strcmp(cmd, "--help")) { usage(); return finish_command(cmd, 0, start_ms); }
 
-    int rc = 1;
-
-    if (strcmp(cmd, "index") == 0) {
-        rc = cmd_index(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-if (strcmp(cmd, "ingest") == 0) {
-rc = cmd_ingest(argc - 2, argv + 2);
-return finish_command(cmd, rc, start_ms);
-}
-
-
-if (strcmp(cmd, "learn") == 0) {
-rc = cmd_learn(argc - 2, argv + 2);
-return finish_command(cmd, rc, start_ms);
-}
-
-
-    if (strcmp(cmd, "bench-scan") == 0) {
-        return cmd_bench_scan(argc, argv);
-    }
-
-if (strcmp(cmd, "bench") == 0) {
-rc = cmd_bench(argc - 2, argv + 2);
-return finish_command(cmd, rc, start_ms);
-}
-
-    if (strcmp(cmd, "search") == 0) {
-        rc = cmd_search(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "trace") == 0) {
-        rc = cmd_trace(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "region-search") == 0) {
-        rc = cmd_region_search(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "zone") == 0) {
-        rc = cmd_zone(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "checkpoint") == 0) {
-        rc = cmd_checkpoint(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "zsig") == 0) {
-        rc = cmd_zsig(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "zone-search") == 0) {
-        rc = cmd_zone_search(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "thumbnail") == 0) {
-        rc = cmd_thumbnail(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "stats") == 0 || strcmp(cmd, "status") == 0) {
-        rc = cmd_stats(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "dedupe") == 0) {
-        rc = cmd_dedupe(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "action") == 0) {
-        rc = cmd_action(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "session") == 0) {
-        rc = cmd_session(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "history") == 0) {
-        rc = cmd_history(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "hash-v0") == 0) return cmd_hash_v0(argc - 2, argv + 2);
-    if (strcmp(cmd, "hash-v0-grid") == 0) return cmd_hash_v0_grid(argc - 2, argv + 2);
-    if (strcmp(cmd, "hash-compare") == 0) return cmd_hash_compare(argc - 2, argv + 2);
-    if (strcmp(cmd, "hash-native") == 0) return cmd_hash_native(argc - 2, argv + 2);
-    if (strcmp(cmd, "hash-native-grid") == 0) return cmd_hash_native_grid(argc - 2, argv + 2);
-    if (strcmp(cmd, "similar") == 0) {
-        rc = cmd_similar(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "window-api") == 0) {
-        rc = cmd_window_api(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "doctor") == 0) {
-        rc = loogal_doctor();
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "config") == 0) {
-        rc = cmd_config(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-    if (strcmp(cmd, "why") == 0) {
-        rc = cmd_why(argc - 2, argv + 2);
-        return finish_command(cmd, rc, start_ms);
-    }
-
-if (strcmp(cmd, "verify") == 0) {
-rc = cmd_verify(argc - 2, argv + 2);
-return finish_command(cmd, rc, start_ms);
-}
-
-if (strcmp(cmd, "rebuild") == 0) {
-rc = cmd_rebuild(argc - 2, argv + 2);
-return finish_command(cmd, rc, start_ms);
-}
-
-    if (strcmp(cmd, "where") == 0) {
-rc = cmd_where(argc - 2, argv + 2);
-return finish_command(cmd, rc, start_ms);
-}
-
-if (strcmp(cmd, "help") == 0 || strcmp(cmd, "--help") == 0) {
-        usage();
-        return finish_command(cmd, 0, start_ms);
+    for (int i = 0; commands[i].name; i++) {
+        if (!strcmp(cmd, commands[i].name)) {
+            int rc = commands[i].fn(argc - 2, argv + 2);
+            return finish_command(cmd, rc, start_ms);
+        }
     }
 
     usage();
