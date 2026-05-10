@@ -20,7 +20,8 @@ static void usage(void) {
     puts("==============================");
     puts("loogal zsig <image> --box x,y,w,h [--shape box|polygon]");
     puts("");
-    puts("Deterministic region signatures for future continuity search.");
+    puts("Creates a continuity witness for a bounded region.");
+    puts("V1 combines image perceptual witnesses with canonical geometry.");
 }
 
 int cmd_zsig(int argc, char **argv) {
@@ -43,10 +44,30 @@ int cmd_zsig(int argc, char **argv) {
         return 1;
     }
 
+    LoogalImageInfo info;
+    memset(&info, 0, sizeof(info));
+
+    if (image_probe(image, &info) != 0) {
+        loogal_die("zsig", "could not probe source image");
+        return 1;
+    }
+
     char canonical[4096];
-    snprintf(canonical, sizeof(canonical), "%s|%s|%s", image, shape, box);
+    snprintf(
+        canonical,
+        sizeof(canonical),
+        "%s|%s|%s|%dx%d|%016llx|%016llx",
+        image,
+        shape,
+        box,
+        info.width,
+        info.height,
+        (unsigned long long)info.dhash,
+        (unsigned long long)info.ahash
+    );
 
     uint64_t sig = fnv1a_u64(canonical);
+    uint64_t geom_sig = fnv1a_u64(box);
 
     ensure_dirs();
 
@@ -58,16 +79,26 @@ int cmd_zsig(int argc, char **argv) {
 
     fprintf(f,
         "{\"type\":\"zone.signature\","
-        "\"schema\":\"locus.zsig:v1\","
+        "\"schema\":\"locus.zsig:v2\","
         "\"image\":\"%s\","
         "\"shape\":\"%s\","
         "\"box\":\"%s\","
+        "\"image_width\":%d,"
+        "\"image_height\":%d,"
+        "\"image_dhash\":\"%016llx\","
+        "\"image_ahash\":\"%016llx\","
+        "\"geometry_signature\":\"%016llx\","
         "\"signature\":\"%016llx\","
         "\"created_unix\":%ld}"
         "\n",
         image,
         shape,
         box,
+        info.width,
+        info.height,
+        (unsigned long long)info.dhash,
+        (unsigned long long)info.ahash,
+        (unsigned long long)geom_sig,
         (unsigned long long)sig,
         now_unix());
 
@@ -75,11 +106,15 @@ int cmd_zsig(int argc, char **argv) {
 
     puts("ZONE SIGNATURE GENERATED");
     puts("==============================");
-    printf("image:      %s\n", image);
-    printf("shape:      %s\n", shape);
-    printf("region:     %s\n", box);
-    printf("signature:  %016llx\n", (unsigned long long)sig);
-    printf("database:   data/zone_signatures.jsonl\n");
+    printf("image:       %s\n", image);
+    printf("shape:       %s\n", shape);
+    printf("region:      %s\n", box);
+    printf("dimensions:  %dx%d\n", info.width, info.height);
+    printf("dhash:       %016llx\n", (unsigned long long)info.dhash);
+    printf("ahash:       %016llx\n", (unsigned long long)info.ahash);
+    printf("geometry:    %016llx\n", (unsigned long long)geom_sig);
+    printf("signature:   %016llx\n", (unsigned long long)sig);
+    printf("database:    data/zone_signatures.jsonl\n");
 
     loogal_log("zsig", "ok", canonical);
 
