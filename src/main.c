@@ -19,6 +19,9 @@
 #include "trace.h"
 #include "region_search.h"
 #include "zone.h"
+#include "checkpoint.h"
+#include "zsig.h"
+#include "zone_search.h"
 #include "loogal/watch_config.h"
 #include "loogal/watch_run.h"
 #include "loogal/watch_event.h"
@@ -38,6 +41,9 @@ puts("  loogal ingest <path> [--all|--pdf|--comics|--images-only] --dry-run [--j
     puts("  loogal trace <path>");
     puts("  loogal region-search <crop.png> [place]");
     puts("  loogal zone add <image> --box x,y,w,h --name <label>");
+    puts("  loogal checkpoint create|save|commit ...");
+    puts("  loogal zsig <image> --box x,y,w,h");
+    puts("  loogal zone-search <signature>");
     puts("  loogal stats");
     puts("  loogal dedupe --keep N [--dry-run] [--move-removed DIR] [--protect DIR...]");
     puts("  loogal thumbnail <path|create|session|status>");
@@ -137,6 +143,21 @@ return finish_command(cmd, rc, start_ms);
 
     if (strcmp(cmd, "zone") == 0) {
         rc = cmd_zone(argc - 2, argv + 2);
+        return finish_command(cmd, rc, start_ms);
+    }
+
+    if (strcmp(cmd, "checkpoint") == 0) {
+        rc = cmd_checkpoint(argc - 2, argv + 2);
+        return finish_command(cmd, rc, start_ms);
+    }
+
+    if (strcmp(cmd, "zsig") == 0) {
+        rc = cmd_zsig(argc - 2, argv + 2);
+        return finish_command(cmd, rc, start_ms);
+    }
+
+    if (strcmp(cmd, "zone-search") == 0) {
+        rc = cmd_zone_search(argc - 2, argv + 2);
         return finish_command(cmd, rc, start_ms);
     }
 
