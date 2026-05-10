@@ -11,6 +11,8 @@
 
 static const int SHARD_SCALES[] = {64, 96, 128, 192};
 static const int SHARD_SCALE_COUNT = 4;
+static uint64_t g_region_hash_failures = 0;
+static uint64_t g_fallback_tiles = 0;
 
 typedef struct {
     char magic[8];
@@ -79,14 +81,7 @@ static int load_path_for_id(uint32_t wanted, char *out, size_t out_sz) {
     return 1;
 }
 
-static int emit_tile(FILE *out, uint32_t image_id, const char *path, int x, int y, int w, int h) {
-    uint64_t dhash = 0;
-    uint64_t ahash = 0;
-
-    if (compute_region_hashes(path, x, y, w, h, &dhash, &ahash) != 0) {
-        return 0;
-    }
-
+static int write_tile(FILE *out, uint32_t image_id, uint64_t dhash, uint64_t ahash, int x, int y, int w, int h) {
     ShardDiskTile t;
     memset(&t, 0, sizeof(t));
     t.dhash = dhash;
@@ -96,8 +91,30 @@ static int emit_tile(FILE *out, uint32_t image_id, const char *path, int x, int 
     t.y = (uint32_t)y;
     t.w = (uint32_t)w;
     t.h = (uint32_t)h;
-
     return fwrite(&t, sizeof(t), 1, out) == 1 ? 1 : 0;
+}
+
+static int emit_tile(FILE *out, uint32_t image_id, const char *path, int x, int y, int w, int h) {
+    uint64_t dhash = 0;
+    uint64_t ahash = 0;
+
+    if (compute_region_hashes(path, x, y, w, h, &dhash, &ahash) != 0) {
+        g_region_hash_failures++;
+        return 0;
+    }
+
+    return write_tile(out, image_id, dhash, ahash, x, y, w, h);
+}
+
+static uint64_t emit_fallback_record_tile(FILE *out, const LoogalRecord *rec, uint32_t image_id) {
+    if (!rec) return 0;
+    int w = rec->width > 0 ? rec->width : LOOGAL_SHARD_TILE_SIZE;
+    int h = rec->height > 0 ? rec->height : LOOGAL_SHARD_TILE_SIZE;
+    if (write_tile(out, image_id, rec->dhash, rec->ahash, 0, 0, w, h)) {
+        g_fallback_tiles++;
+        return 1;
+    }
+    return 0;
 }
 
 static uint64_t emit_tiles_for_record(FILE *out, const LoogalRecord *rec, uint32_t image_id) {
@@ -139,9 +156,7 @@ static uint64_t emit_tiles_for_record(FILE *out, const LoogalRecord *rec, uint32
     }
 
     if (written == 0) {
-        int w = rec->width > 0 ? rec->width : LOOGAL_SHARD_TILE_SIZE;
-        int h = rec->height > 0 ? rec->height : LOOGAL_SHARD_TILE_SIZE;
-        written += (uint64_t)emit_tile(out, image_id, rec->path, 0, 0, w, h);
+        written += emit_fallback_record_tile(out, rec, image_id);
     }
 
     return written;
@@ -150,6 +165,9 @@ static uint64_t emit_tiles_for_record(FILE *out, const LoogalRecord *rec, uint32
 static int build_from_existing_index(void) {
     LoogalRecord *records = NULL;
     size_t record_count = 0;
+
+    g_region_hash_failures = 0;
+    g_fallback_tiles = 0;
 
     if (read_index_records(&records, &record_count) != 0) {
         loogal_die("shard-index", "could not read existing loogal binary index; run loogal index first");
@@ -189,6 +207,13 @@ static int build_from_existing_index(void) {
         uint64_t n = emit_tiles_for_record(out, &records[i], (uint32_t)i);
         header.tile_count += n;
         if (n > 0) images_with_tiles++;
+        if ((i + 1) % 25 == 0 || i + 1 == record_count) {
+            printf("shard-index progress: %zu/%zu images, %llu tiles\n",
+                   i + 1,
+                   record_count,
+                   (unsigned long long)header.tile_count);
+            fflush(stdout);
+        }
     }
 
     fseek(out, 0, SEEK_SET);
@@ -201,14 +226,21 @@ static int build_from_existing_index(void) {
     free(records);
 
     printf("SHARD INDEX BUILT\n");
-    printf("mode:     overlapping region witnesses\n");
-    printf("images:   %llu\n", (unsigned long long)images_with_tiles);
-    printf("tiles:    %llu\n", (unsigned long long)header.tile_count);
-    printf("scales:   64,96,128,192\n");
-    printf("stride:   half tile size\n");
-    printf("time:     %.3f ms\n", elapsed);
-    printf("index:    %s\n", LOOGAL_SHARD_INDEX_PATH);
-    printf("paths:    %s\n", LOOGAL_SHARD_MAP_PATH);
+    printf("mode:       overlapping region witnesses\n");
+    printf("images:     %llu\n", (unsigned long long)images_with_tiles);
+    printf("tiles:      %llu\n", (unsigned long long)header.tile_count);
+    printf("fallbacks:  %llu\n", (unsigned long long)g_fallback_tiles);
+    printf("failures:   %llu\n", (unsigned long long)g_region_hash_failures);
+    printf("scales:     64,96,128,192\n");
+    printf("stride:     half tile size\n");
+    printf("time:       %.3f ms\n", elapsed);
+    printf("index:      %s\n", LOOGAL_SHARD_INDEX_PATH);
+    printf("paths:      %s\n", LOOGAL_SHARD_MAP_PATH);
+
+    if (header.tile_count == 0) {
+        loogal_die("shard-index", "built zero tiles; shard index unusable");
+        return 1;
+    }
 
     loogal_log("shard-index", "ok", LOOGAL_SHARD_INDEX_PATH);
     return 0;
