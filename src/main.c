@@ -23,6 +23,7 @@
 #include "zone_search.h"
 #include "cobj.h"
 #include "rel.h"
+#include "manifest_cmd.h"
 #include "loogal/watch_config.h"
 #include "loogal/watch_run.h"
 #include "loogal/watch_event.h"
@@ -48,6 +49,7 @@ static Cmd commands[] = {
     {"zsig", "create deterministic zone signatures", cmd_zsig},
     {"zone-search", "retrieve zone signature records", cmd_zone_search},
     {"cobj", "create/trace portable continuity objects", cmd_cobj},
+    {"manifest", "attach manifestations to continuity objects", cmd_manifest},
     {"rel", "add/trace continuity graph relationships", cmd_rel},
     {"thumbnail", "create and inspect thumbnails", cmd_thumbnail},
     {"stats", "show memory corpus stats", cmd_stats},
